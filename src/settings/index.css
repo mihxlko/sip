@@ -1,0 +1,20 @@
+@import '../tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  background: var(--surface-base);
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  width: 100%;
+  max-width: 2240px;
+  padding: var(--space-padding-xl);
+  box-sizing: border-box;
+}

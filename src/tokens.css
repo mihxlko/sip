@@ -1,0 +1,200 @@
+/* ─── SIP design tokens ────────────────────────────────────────────────────
+   Primitive → semantic structure.
+   Only semantic tokens appear in [data-theme] blocks — primitives are
+   constants and never need to change between themes.
+   ─────────────────────────────────────────────────────────────────────── */
+
+:root {
+
+  /* ── primitive: neutrals ─────────────────────────────────────────────── */
+  --white: #FFFFFF;
+  --black: #000000;
+
+  --neutral-03:  #FBFBFB;
+  --neutral-50:  #F1F1F2;
+  --neutral-75:  #EAEAEC;
+  --neutral-100: #E3E3E5;
+  --neutral-150: #D4D5D8;
+  --neutral-200: #C6C7CC;
+  --neutral-300: #AAABB2;
+  --neutral-400: #8D8F98;
+  --neutral-500: #71737F;
+  --neutral-600: #5A5C65;
+  --neutral-700: #44454C;
+  --neutral-750: #333439;
+  --neutral-800: #2D2E33;
+  --neutral-825: #2A2B30;
+  --neutral-850: #28282C;
+  --neutral-875: #252529;
+  --neutral-900: #222326;
+  --neutral-925: #1F2023;
+  --neutral-950: #1C1D20;
+  --neutral-997: #171719;
+
+  /* ── primitive: functional ──────────────────────────────────────────── */
+  --red-10:  #FFEAEA;
+  --red-300: #FED3D3;
+  --red-400: #F97A74;
+  --red-500: #F75951;  /* error / destructive */
+  --red-600: #C64741;
+  --red-700: #573940;
+  --red-800: #3B272C;
+
+  /* ── primitive: brand ───────────────────────────────────────────────── */
+  --brand-primary-500:    #51A0EA;  /* logo bottom gradient, blue text  */
+  --brand-secondary-500:  #79D4EE;  /* logo top gradient (dark mode)    */
+  --brand-secondary-200:  #C9EEF8;  /* logo bottom gradient (light mode)*/
+  --brand-secondary-100:  #E4F6FC;  /* logo top gradient (light mode)   */
+  --brand-secondary-003:  #FBFEFE;  /* logo text                        */
+
+  /* ── primitive: bottle palette ─────────────────────────────────────── */
+  --bottle-pink:   #FC7792;
+  --bottle-orange: #F47E47;
+  --bottle-yellow: #F2CE33;
+  --bottle-green:  #00B97D;
+  --bottle-blue:   #5FB2EB;
+  --bottle-purple: #B938F6;
+
+  /* ── semantic: surfaces (light defaults) ───────────────────────────── */
+  --surface-elevated: var(--white);
+  --surface-primary:  var(--white);
+  --surface-base:     var(--neutral-03);
+
+  /* ── semantic: text (light defaults) ───────────────────────────────── */
+  --text-primary:   var(--neutral-800);
+  --text-secondary: var(--neutral-700);
+  --text-tertiary:  var(--neutral-400);
+  --text-muted:     var(--neutral-300);
+  --text-error:     var(--red-500);
+  --text-brand:     var(--brand-primary-500);
+
+  /* ── semantic: interaction overlays (light defaults) ───────────────── */
+  --state-hover:    rgba(0, 0, 0, 0.03);
+  --state-active:   rgba(0, 0, 0, 0.07);
+  --state-selected: rgba(0, 0, 0, 0.05);
+
+  /* ── semantic: borders (light defaults) ────────────────────────────── */
+  --border-default: var(--neutral-100);
+  --border-strong:  var(--neutral-150);
+  --border-focus:   var(--neutral-150);
+
+  /* ── semantic: button ───────────────────────────────────────────────── */
+  --color-button: var(--surface-primary);
+
+  /* ── typography ─────────────────────────────────────────────────────── */
+  --font-sans: "SF Pro Rounded", sans-serif;
+
+  --text-sm: 12px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 60px;
+
+  --font-medium:   500;
+  --font-semibold: 600;
+
+  --leading-tight:  1.25;
+  --leading-normal: 1.5;
+
+  --letter-spacing-tight:  -1px;
+  --letter-spacing-normal:  0px;
+
+  /* ── spacing: gap scale ─────────────────────────────────────────────── */
+  --space-gap-xs:  4px;
+  --space-gap-sm:  10px;
+  --space-gap-md:  16px;
+  --space-gap-lg:  24px;
+  --space-gap-xl:  30px;
+  --space-gap-xxl: 50px;
+
+  /* ── spacing: padding / inset scale ────────────────────────────────── */
+  --space-padding-xs:  4px;
+  --space-padding-sm:  6px;
+  --space-padding-md:  8px;
+  --space-padding-lg:  16px;
+  --space-padding-xl:  20px;
+  --space-padding-xxl: 50px;
+
+  /* ── border widths ──────────────────────────────────────────────────── */
+  --border-width-default: 0.5px;
+
+  /* ── border radius ──────────────────────────────────────────────────── */
+  --radius-xs:  4px;
+  --radius-sm:  6px;
+  --radius-md:  8px;
+  --radius-lg:  10px;  /* main app cards                */
+  --radius-xl:  16px;  /* notification toast            */
+  --radius-xxl: 20px;  /* main app overlay              */
+
+  /* ── shadows ────────────────────────────────────────────────────────── */
+  --box-shadow-subtle:  0px 1px 4px 0px rgba(0, 0, 0, 0.03);
+  --box-shadow-default: 0px 2px 10px 0px rgba(0, 0, 0, 0.05);
+  --box-shadow-strong:  0px 4px 10px 0px rgba(0, 0, 0, 0.05);
+}
+
+/* ── explicit light theme ─────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --surface-elevated: var(--white);
+  --surface-primary:  var(--white);
+  --surface-base:     var(--neutral-03);
+
+  --text-primary:   var(--neutral-800);
+  --text-secondary: var(--neutral-700);
+  --text-tertiary:  var(--neutral-400);
+  --text-muted:     var(--neutral-300);
+
+  --state-hover:    rgba(0, 0, 0, 0.03);
+  --state-active:   rgba(0, 0, 0, 0.07);
+  --state-selected: rgba(0, 0, 0, 0.05);
+
+  --border-default: var(--neutral-100);
+  --border-strong:  var(--neutral-150);
+  --border-focus:   var(--neutral-150);
+
+  --color-button: var(--surface-primary);
+}
+
+/* ── explicit dark theme ──────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --surface-elevated: var(--neutral-800);
+  --surface-primary:  var(--neutral-900);
+  --surface-base:     var(--neutral-950);
+
+  --text-primary:   var(--neutral-50);
+  --text-secondary: var(--neutral-150);
+  --text-tertiary:  var(--neutral-400);
+  --text-muted:     var(--neutral-500);
+
+  --state-hover:    rgba(255, 255, 255, 0.06);
+  --state-active:   rgba(255, 255, 255, 0.10);
+  --state-selected: rgba(255, 255, 255, 0.08);
+
+  --border-default: var(--neutral-750);
+  --border-strong:  var(--neutral-700);
+  --border-focus:   var(--neutral-600);
+
+  --color-button: var(--surface-primary);
+}
+
+/* ── system dark preference (no explicit data-theme set) ─────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --surface-elevated: var(--neutral-800);
+    --surface-primary:  var(--neutral-900);
+    --surface-base:     var(--neutral-950);
+
+    --text-primary:   var(--neutral-50);
+    --text-secondary: var(--neutral-100);
+    --text-tertiary:  var(--neutral-300);
+    --text-muted:     var(--neutral-400);
+
+    --state-hover:    rgba(255, 255, 255, 0.06);
+    --state-active:   rgba(255, 255, 255, 0.10);
+    --state-selected: rgba(255, 255, 255, 0.08);
+
+    --border-default: var(--neutral-750);
+    --border-strong:  var(--neutral-700);
+    --border-focus:   var(--neutral-600);
+
+    --color-button: var(--surface-primary);
+  }
+}
