@@ -3,6 +3,21 @@ import {
   BottleColor, BottleType, DEFAULT_PREFS, getPrefs,
   setPrefs as persistPrefs, type SipPrefs,
 } from '../types/prefs'
+import SipToast from './SipToast'
+
+const PREVIEW_ANIMATIONS = `
+  @keyframes sip-in  {
+    from { opacity: 0; transform: scale(.96) translateY(-4px) }
+    to   { opacity: 1; transform: scale(1)   translateY(0)    }
+  }
+  @keyframes sip-out {
+    from { opacity: 1; transform: scale(1)   translateY(0)    }
+    to   { opacity: 0; transform: scale(.96) translateY(-4px) }
+  }
+  .toast     { animation: sip-in  0.22s cubic-bezier(.16,1,.3,1) both; pointer-events: auto; }
+  .toast.out { animation: sip-out 0.20s ease-in both; }
+  *, *::before, *::after { box-sizing: border-box; }
+`
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -55,6 +70,8 @@ interface Props { onClose: () => void }
 export default function Settings({ onClose }: Props) {
   const [prefs, setPrefsState] = useState<SipPrefs>(DEFAULT_PREFS)
   const [clockInput, setClockInput] = useState('00:15')
+  const [showTestToast, setShowTestToast] = useState(false)
+  const [toastKey, setToastKey] = useState(0)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
   const clockTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const modalRef = useRef<HTMLDivElement>(null)
@@ -145,7 +162,8 @@ export default function Settings({ onClose }: Props) {
   }
 
   function testToast() {
-    chrome.runtime.sendMessage({ type: 'TEST_TOAST', prefs })
+    setToastKey(k => k + 1)
+    setShowTestToast(true)
   }
 
   function pickIcon() {
@@ -165,7 +183,14 @@ export default function Settings({ onClose }: Props) {
   const dark  = resolveIsDark(prefs.theme)
 
   return (
-    // content root — also the data-theme target for token cascade into children
+    <>
+    <style>{PREVIEW_ANIMATIONS}</style>
+    {showTestToast && (
+      <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}>
+        <SipToast key={toastKey} prefs={prefs} onDismiss={() => setShowTestToast(false)} mode="preview" />
+      </div>
+    )}
+    {/* content root — also the data-theme target for token cascade into children */}
     <div
       ref={modalRef}
       className="w-full font-sans antialiased flex flex-col gap-gap-lg"
@@ -192,7 +217,7 @@ export default function Settings({ onClose }: Props) {
           {/* Test button: rounded-full = design's 25px radius — no exact token */}
           <button
             onClick={testToast}
-            className="cursor-pointer bg-surface-elevated border-0.5 border-border-default rounded-full shadow-subtle px-gap-md py-xs text-sm font-semibold text-text-secondary appearance-none outline-none"
+            className="cursor-pointer bg-surface-elevated border-0.5 border-border-default rounded-full shadow-subtle px-gap-md py-xs text-sm font-semibold text-text-secondary appearance-none outline-none hover:bg-state-hover hover:text-text-primary"
           >
             Test
           </button>
@@ -411,6 +436,7 @@ export default function Settings({ onClose }: Props) {
         </div>{/* /bottom-controls */}
         </div>{/* /settings-controls */}
     </div>
+    </>
   )
 }
 

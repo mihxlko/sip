@@ -3,7 +3,7 @@ console.log('SIP content script loaded')
 import { createRoot, type Root } from 'react-dom/client'
 import { type SipPrefs } from '../types/prefs'
 import SipToast from './SipToast'
-import toastStyles from './toast.css?inline'
+import shadowStyles from './shadow.css?inline'
 
 // Animation keyframes live here rather than in toast.css so they don't get
 // purged by Tailwind (which only keeps classes it finds in content files).
@@ -31,16 +31,15 @@ function mountToast(prefs: SipPrefs) {
 
   toastEl = document.createElement('div')
   toastEl.style.cssText = [
-    'position:fixed', 'inset:0', 'z-index:2147483647',
-    'pointer-events:none', 'display:flex',
-    'align-items:flex-start', 'justify-content:center',
+    'position:fixed', 'top:16px', 'right:16px',
+    'z-index:2147483647', 'pointer-events:none',
   ].join(';')
 
   const shadow = toastEl.attachShadow({ mode: 'open' })
 
-  const utilitiesEl = document.createElement('style')
-  utilitiesEl.textContent = toastStyles
-  shadow.appendChild(utilitiesEl)
+  const shadowEl = document.createElement('style')
+  shadowEl.textContent = shadowStyles
+  shadow.appendChild(shadowEl)
 
   const animEl = document.createElement('style')
   animEl.textContent = ANIMATIONS
@@ -65,5 +64,8 @@ function cleanupToast() {
 // ─── message listener ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'SHOW_TOAST') mountToast(msg.prefs as SipPrefs)
+  if (msg.type === 'SHOW_TOAST') {
+    if (window.location.protocol === 'chrome-extension:') return
+    mountToast(msg.prefs as SipPrefs)
+  }
 })

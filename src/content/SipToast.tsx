@@ -29,9 +29,9 @@ function resolveIsDark(theme: SipPrefs['theme']): boolean {
 
 // ─── component ───────────────────────────────────────────────────────────────
 
-interface Props { prefs: SipPrefs; onDismiss: () => void }
+interface Props { prefs: SipPrefs; onDismiss: () => void; mode?: 'live' | 'preview' }
 
-export default function SipToast({ prefs, onDismiss }: Props) {
+export default function SipToast({ prefs, onDismiss, mode = 'live' }: Props) {
   const [out, setOut] = useState(false)
   const dark        = resolveIsDark(prefs.theme)
   const bottleColor = BOTTLE_COLOR[prefs.bottleColor]
@@ -48,6 +48,7 @@ export default function SipToast({ prefs, onDismiss }: Props) {
   }
 
   function openPrefs() {
+    if (mode === 'preview') return
     chrome.runtime.sendMessage({ type: 'OPEN_SETTINGS_TAB' })
     dismiss()
   }
@@ -96,8 +97,7 @@ export default function SipToast({ prefs, onDismiss }: Props) {
             {/* edit preferences */}
             <button
               onClick={openPrefs}
-              style={{ all: 'unset' }}
-              className="cursor-pointer text-text-brand text-sm font-medium leading-[16px] w-fit"
+              className="cursor-pointer bg-transparent border-0 p-0 outline-none appearance-none text-text-brand text-sm font-medium leading-[16px] w-fit"
             >
               Edit preferences
             </button>
@@ -108,8 +108,7 @@ export default function SipToast({ prefs, onDismiss }: Props) {
         <button
           onClick={dismiss}
           aria-label="Dismiss"
-          style={{ all: 'unset' }}
-          className="cursor-pointer shrink-0 leading-none p-xs text-text-muted"
+          className="cursor-pointer bg-transparent border-0 outline-none appearance-none shrink-0 leading-none p-xs text-text-muted"
         >
           <XIcon />
         </button>
