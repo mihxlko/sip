@@ -5,20 +5,6 @@ import {
 } from '../types/prefs'
 import SipToast from './SipToast'
 
-const PREVIEW_ANIMATIONS = `
-  @keyframes sip-in  {
-    from { opacity: 0; transform: scale(.96) translateY(-4px) }
-    to   { opacity: 1; transform: scale(1)   translateY(0)    }
-  }
-  @keyframes sip-out {
-    from { opacity: 1; transform: scale(1)   translateY(0)    }
-    to   { opacity: 0; transform: scale(.96) translateY(-4px) }
-  }
-  .toast     { animation: sip-in  0.22s cubic-bezier(.16,1,.3,1) both; pointer-events: auto; }
-  .toast.out { animation: sip-out 0.20s ease-in both; }
-  *, *::before, *::after { box-sizing: border-box; }
-`
-
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const BOTTLE_COLORS: Record<BottleColor, string> = {
@@ -184,7 +170,6 @@ export default function Settings({ onClose }: Props) {
 
   return (
     <>
-    <style>{PREVIEW_ANIMATIONS}</style>
     {showTestToast && (
       <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}>
         <SipToast key={toastKey} prefs={prefs} onDismiss={() => setShowTestToast(false)} mode="preview" />
@@ -298,7 +283,7 @@ export default function Settings({ onClose }: Props) {
             <div className="flex flex-col gap-xs">
               <div className="flex justify-between items-center">
                 <span className="text-text-muted text-md font-medium pl-[8px]">Title</span>
-                <span className={`${prefs.titleText.length >= 30 ? 'text-text-error' : 'text-text-muted'} text-md font-medium pr-[8px]`}>{prefs.titleText.length}/40 Characters</span>
+                <span className={`${prefs.titleText.length >= 35 ? 'text-text-error' : 'text-text-muted'} text-md font-medium pr-[8px]`}>{prefs.titleText.length}/40 Characters</span>
               </div>
               {/* rounded-xs (4px) ≈ design's 5px — 1px deviation, no 5px radius token */}
               <input
@@ -313,12 +298,12 @@ export default function Settings({ onClose }: Props) {
             <div className="flex flex-col gap-xs">
               <div className="flex justify-between items-center">
                 <span className="text-text-muted text-md font-medium pl-[8px]">Message</span>
-                <span className={`${prefs.messageText.length >= 55 ? 'text-text-error' : 'text-text-muted'} text-md font-medium pr-[8px]`}>{prefs.messageText.length}/65 Characters</span>
+                <span className={`${prefs.messageText.length >= 55 ? 'text-text-error' : 'text-text-muted'} text-md font-medium pr-[8px]`}>{prefs.messageText.length}/60 Characters</span>
               </div>
               {/* height:72px: no token */}
               <textarea
                 value={prefs.messageText}
-                maxLength={65}
+                maxLength={60}
                 onChange={e => update({ messageText: e.target.value })}
                 className="bg-surface-elevated border-0.5 border-border-default rounded-xs shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none focus:border-1.5 focus:border-border-focus"
                 style={{ height: 72 }}
@@ -447,13 +432,13 @@ function ToastPreview({ prefs, dark }: { prefs: SipPrefs; dark: boolean }) {
   const src = bottleSrc(prefs.bottleType)
 
   return (
-    <div className="w-[500px] bg-surface-elevated border-0.5 border-border-default rounded-xl shadow p-pad-xl flex flex-col overflow-clip">
+    <div className="w-[450px] bg-surface-elevated border-0.5 border-border-default rounded-xl shadow p-pad-xl flex flex-col overflow-clip">
 
       {/* ── inner row: toast-left + close × ── */}
-      <div className="flex gap-gap-xxl items-start justify-between">
+      <div className="flex gap-gap-xl items-start justify-between">
 
         {/* toast-left: bottle + main content */}
-        <div className="flex gap-pad-xl items-start">
+        <div className="flex flex-1 min-w-0 gap-pad-xl items-start">
 
           {/* bottle with color tint */}
           <div style={{ position: 'relative', width: 24, height: 60, flexShrink: 0, isolation: 'isolate' }}>
@@ -462,9 +447,9 @@ function ToastPreview({ prefs, dark }: { prefs: SipPrefs; dark: boolean }) {
           </div>
 
           {/* main content */}
-          <div className="flex flex-col gap-pad-xl">
+          <div className="flex flex-1 min-w-0 flex-col gap-pad-xl">
             <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-pad-sm max-w-[350px]">
+              <div className="flex items-center gap-pad-sm max-w-full">
                 <span className="min-w-0 text-text-primary text-lg font-semibold leading-tight overflow-hidden text-ellipsis whitespace-nowrap">
                   {prefs.titleText || 'Title'}
                 </span>
@@ -477,8 +462,7 @@ function ToastPreview({ prefs, dark }: { prefs: SipPrefs; dark: boolean }) {
                   </div>
                 )}
               </div>
-              {/* message — 350px fixed; drives the toast's overall width */}
-              <p className="m-0 w-[350px] text-text-muted text-sm font-medium leading-[16px]">
+              <p className="m-0 text-text-muted text-sm font-medium leading-[16px]">
                 {prefs.messageText || 'Message'}
               </p>
             </div>

@@ -14,7 +14,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 async function fireReminder(): Promise<void> {
   const prefs = await getPrefs()
 
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
   const tab  = tabs[0]
   if (tab && tab.id !== undefined) {
     chrome.tabs.sendMessage(tab.id, { type: 'SHOW_TOAST', prefs }).catch(() => {
@@ -33,9 +33,9 @@ async function fireReminder(): Promise<void> {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'UPDATE_ALARM') {
-    const { intervalMinutes, enabled } = message.payload as { intervalMinutes: number; enabled: boolean }
+    const { intervalMinutes } = message.payload as { intervalMinutes: number }
     chrome.alarms.clear(ALARM_NAME, () => {
-      if (enabled) scheduleAlarm(intervalMinutes)
+      scheduleAlarm(intervalMinutes)
       sendResponse({ success: true })
     })
     return true

@@ -54,42 +54,42 @@ export default function SipToast({ prefs, onDismiss, mode = 'live' }: Props) {
   }
 
   return (
-    <div className={`${out ? 'toast out' : 'toast'} w-[500px] bg-surface-elevated border-0.5 border-border-default rounded-xl shadow p-pad-xl flex flex-col overflow-clip font-sans antialiased`}>
+    <div className={`${out ? 'toast out' : 'toast'} sip-toast`}>
 
       {/* ── inner row: toast-left + close × ── */}
-      <div className="flex gap-gap-xxl items-start justify-between">
+      <div className="sip-toast-row">
 
         {/* toast-left: bottle + main content */}
-        <div className="flex gap-pad-xl items-start">
+        <div className="sip-toast-left">
 
           {/* bottle */}
           <BottleIcon color={bottleColor} type={prefs.bottleType} />
 
           {/* main content */}
-          <div className="flex flex-col gap-pad-xl">
+          <div className="sip-toast-content">
 
             {/* header */}
-            <div className="flex flex-col gap-0.5">
+            <div className="sip-toast-header">
 
               {/* title row — max-w matches the message width so a long title
                   can't push main-content wider than the 350px message */}
-              <div className="flex items-center gap-pad-sm max-w-[350px]">
-                <span className="min-w-0 text-text-primary text-lg font-semibold leading-tight tracking-normal overflow-hidden text-ellipsis whitespace-nowrap">
+              <div className="sip-toast-title-row">
+                <span className="sip-toast-title">
                   {prefs.titleText}
                 </span>
 
                 {prefs.showLogo && (
-                  <div className="shrink-0 mb-0.5">
+                  <div className="sip-toast-badge">
                     {prefs.customIcon
-                      ? <img src={prefs.customIcon} width={28} height={18} className="block rounded-md object-cover" />
+                      ? <img src={prefs.customIcon} width={28} height={18} className="sip-toast-badge-img" />
                       : <SipBadge dark={dark} />
                     }
                   </div>
                 )}
               </div>
 
-              {/* message — 350px fixed; drives the toast's overall width */}
-              <p className="m-0 w-[350px] text-text-muted text-sm font-medium leading-[16px]">
+              {/* message — 350px fixed (outdated); drives the toast's overall width */}
+              <p className="sip-toast-message">
                 {prefs.messageText}
               </p>
             </div>
@@ -97,7 +97,7 @@ export default function SipToast({ prefs, onDismiss, mode = 'live' }: Props) {
             {/* edit preferences */}
             <button
               onClick={openPrefs}
-              className="cursor-pointer bg-transparent border-0 p-0 outline-none appearance-none text-text-brand text-sm font-medium leading-[16px] w-fit"
+              className="sip-toast-edit"
             >
               Edit preferences
             </button>
@@ -108,7 +108,7 @@ export default function SipToast({ prefs, onDismiss, mode = 'live' }: Props) {
         <button
           onClick={dismiss}
           aria-label="Dismiss"
-          className="cursor-pointer bg-transparent border-0 outline-none appearance-none shrink-0 leading-none p-xs text-text-muted"
+          className="sip-toast-close"
         >
           <XIcon />
         </button>

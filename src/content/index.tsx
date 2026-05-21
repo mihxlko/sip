@@ -3,28 +3,18 @@ console.log('SIP content script loaded')
 import { createRoot, type Root } from 'react-dom/client'
 import { type SipPrefs } from '../types/prefs'
 import SipToast from './SipToast'
-import shadowStyles from './shadow.css?inline'
-
-// Animation keyframes live here rather than in toast.css so they don't get
-// purged by Tailwind (which only keeps classes it finds in content files).
-const ANIMATIONS = `
-  @keyframes sip-in  {
-    from { opacity: 0; transform: scale(.96) translateY(-4px) }
-    to   { opacity: 1; transform: scale(1)   translateY(0)    }
-  }
-  @keyframes sip-out {
-    from { opacity: 1; transform: scale(1)   translateY(0)    }
-    to   { opacity: 0; transform: scale(.96) translateY(-4px) }
-  }
-  .toast     { animation: sip-in  0.22s cubic-bezier(.16,1,.3,1) both; pointer-events: auto; }
-  .toast.out { animation: sip-out 0.20s ease-in both; }
-  *, *::before, *::after { box-sizing: border-box; }
-`
+import toastStyles from './toast-styles.css?inline'
 
 // ─── toast ────────────────────────────────────────────────────────────────────
 
 let toastEl: HTMLElement | null = null
 let toastRoot: Root | null = null
+
+function resolveTheme(theme: SipPrefs['theme']): 'dark' | 'light' {
+  if (theme === 'dark') return 'dark'
+  if (theme === 'light') return 'light'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
 
 function mountToast(prefs: SipPrefs) {
   cleanupToast()
@@ -34,16 +24,13 @@ function mountToast(prefs: SipPrefs) {
     'position:fixed', 'top:16px', 'right:16px',
     'z-index:2147483647', 'pointer-events:none',
   ].join(';')
+  toastEl.setAttribute('data-theme', resolveTheme(prefs.theme))
 
   const shadow = toastEl.attachShadow({ mode: 'open' })
 
-  const shadowEl = document.createElement('style')
-  shadowEl.textContent = shadowStyles
-  shadow.appendChild(shadowEl)
-
-  const animEl = document.createElement('style')
-  animEl.textContent = ANIMATIONS
-  shadow.appendChild(animEl)
+  const styleEl = document.createElement('style')
+  styleEl.textContent = toastStyles
+  shadow.appendChild(styleEl)
 
   const container = document.createElement('div')
   shadow.appendChild(container)
