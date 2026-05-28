@@ -155,8 +155,8 @@
 
 /* ── explicit dark theme ──────────────────────────────────────────────────── */
 [data-theme="dark"] {
-  --surface-elevated: var(--neutral-800);
-  --surface-primary:  var(--neutral-900);
+  --surface-elevated: var(--neutral-900);
+  --surface-primary:  var(--neutral-925);
   --surface-base:     var(--neutral-950);
 
   --text-primary:   var(--neutral-50);
@@ -178,8 +178,8 @@
 /* ── system dark preference (no explicit data-theme set) ─────────────────── */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --surface-elevated: var(--neutral-800);
-    --surface-primary:  var(--neutral-900);
+    --surface-elevated: var(--neutral-900);
+    --surface-primary:  var(--neutral-925);
     --surface-base:     var(--neutral-950);
 
     --text-primary:   var(--neutral-50);
