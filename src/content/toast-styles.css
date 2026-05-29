@@ -20,6 +20,7 @@
   --neutral-400: #8D8F98;
   --neutral-500: #71737F;
   --neutral-600: #5A5C65;
+  --neutral-650: #4F5159;
   --neutral-700: #44454C;
   --neutral-750: #333439;
   --neutral-800: #2D2E33;
@@ -133,8 +134,8 @@
 
 [data-theme="dark"],
 :host([data-theme="dark"]) {
-  --surface-elevated: var(--neutral-800);
-  --surface-primary:  var(--neutral-900);
+  --surface-elevated: var(--neutral-900);
+  --surface-primary:  var(--neutral-925);
   --surface-base:     var(--neutral-950);
 
   --text-primary:   var(--neutral-50);
@@ -148,15 +149,19 @@
 
   --border-default: var(--neutral-750);
   --border-strong:  var(--neutral-700);
-  --border-focus:   var(--neutral-600);
+  --border-focus:   var(--neutral-650);
+
+  --box-shadow-subtle:  0px 1px 4px 0px rgba(0, 0, 0, 0.35);
+  --box-shadow-default: 0px 2px 10px 0px rgba(0, 0, 0, 0.40);
+  --box-shadow-strong:  0px 4px 16px 0px rgba(0, 0, 0, 0.55);
 
   --color-button: var(--surface-primary);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --surface-elevated: var(--neutral-800);
-    --surface-primary:  var(--neutral-900);
+    --surface-elevated: var(--neutral-900);
+    --surface-primary:  var(--neutral-925);
     --surface-base:     var(--neutral-950);
 
     --text-primary:   var(--neutral-50);
@@ -170,7 +175,11 @@
 
     --border-default: var(--neutral-750);
     --border-strong:  var(--neutral-700);
-    --border-focus:   var(--neutral-600);
+    --border-focus:   var(--neutral-650);
+
+    --box-shadow-subtle:  0px 1px 4px 0px rgba(0, 0, 0, 0.35);
+    --box-shadow-default: 0px 2px 10px 0px rgba(0, 0, 0, 0.40);
+    --box-shadow-strong:  0px 4px 16px 0px rgba(0, 0, 0, 0.55);
 
     --color-button: var(--surface-primary);
   }

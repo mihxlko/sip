@@ -178,7 +178,7 @@ export default function Settings({ onClose }: Props) {
     {/* content root — also the data-theme target for token cascade into children */}
     <div
       ref={modalRef}
-      className="w-full font-sans antialiased flex flex-col gap-gap-lg"
+      className="w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base"
     >
 
         {/* ── header ── */}
@@ -197,7 +197,7 @@ export default function Settings({ onClose }: Props) {
         <div className="w-full max-w-[850px] mx-auto flex flex-col gap-gap-lg">
 
         {/* ── preview panel ── */}
-        <div className="bg-surface-elevated rounded-lg shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg">
+        <div className="bg-surface-primary rounded-lg shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg">
           <ToastPreview prefs={prefs} dark={dark} />
           {/* Test button: rounded-full = design's 25px radius — no exact token */}
           <button
@@ -212,12 +212,12 @@ export default function Settings({ onClose }: Props) {
         <div className="flex flex-row gap-gap-lg items-stretch">
 
           {/* bottle card — flex-1: takes leftover space after the content-sized right column */}
-          <div className="flex-1 bg-surface-elevated rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
+          <div className="flex-1 bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
             <span className="text-text-secondary text-md font-medium px-[2px]">Bottle</span>
 
             {/* large preview — 250×250 with 50px inner padding */}
             <div
-              className="bg-surface-elevated border-0.5 border-border-default rounded-md shadow-subtle flex items-center justify-center overflow-clip p-pad-xxl"
+              className="bg-surface-base border-0.5 border-border-default rounded-md shadow-subtle flex items-center justify-center overflow-clip p-pad-xxl"
               style={{ width: 250, height: 250 }}
             >
               <img
@@ -238,7 +238,7 @@ export default function Settings({ onClose }: Props) {
                     className={`cursor-pointer relative overflow-clip rounded-md border-0.5 shadow-subtle flex items-center justify-center appearance-none p-0 outline-none ${
                       prefs.bottleType === type
                         ? 'bg-surface-base border-border-strong'
-                        : 'bg-surface-elevated border-border-default'
+                        : 'bg-surface-base border-border-default'
                     }`}
                     style={{ width: 75, height: 75 }}
                   >
@@ -277,7 +277,7 @@ export default function Settings({ onClose }: Props) {
           <div className="flex flex-col gap-gap-lg justify-between">
 
           {/* text card */}
-          <div className="w-full bg-surface-elevated rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
+          <div className="w-full bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium px-[8px]">Text</span>
 
             <div className="flex flex-col gap-xs">
@@ -291,7 +291,7 @@ export default function Settings({ onClose }: Props) {
                 value={prefs.titleText}
                 maxLength={40}
                 onChange={e => update({ titleText: e.target.value })}
-                className="bg-surface-elevated border-0.5 border-border-default rounded-xs shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none focus:border-1.5 focus:border-border-focus"
+                className="bg-surface-primary border-0.5 border-border-default rounded-xs shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none focus:border-1.5 focus:border-border-focus"
               />
             </div>
 
@@ -305,7 +305,7 @@ export default function Settings({ onClose }: Props) {
                 value={prefs.messageText}
                 maxLength={60}
                 onChange={e => update({ messageText: e.target.value })}
-                className="bg-surface-elevated border-0.5 border-border-default rounded-xs shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none focus:border-1.5 focus:border-border-focus"
+                className="bg-surface-primary border-0.5 border-border-default rounded-xs shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none focus:border-1.5 focus:border-border-focus"
                 style={{ height: 72 }}
               />
             </div>
@@ -315,7 +315,7 @@ export default function Settings({ onClose }: Props) {
           <div className="flex flex-row gap-gap-lg items-start">
 
           {/* time card */}
-          <div className="flex-1 bg-surface-elevated rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
+          <div className="flex-1 bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Time</span>
 
             <input
@@ -338,7 +338,7 @@ export default function Settings({ onClose }: Props) {
           </div>
 
           {/* icon card — w-[130px]: fixed width, natural content height */}
-          <div className="w-[130px] shrink-0 bg-surface-elevated rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
+          <div className="w-[130px] shrink-0 bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Icon</span>
 
             {/* 100×100 preview — no token */}
@@ -384,7 +384,7 @@ export default function Settings({ onClose }: Props) {
           </div>
 
           {/* appearance card — w-[130px]: no token, matches popup */}
-          <div className="w-[130px] shrink-0 bg-surface-elevated rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
+          <div className="w-[130px] shrink-0 bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Appearance</span>
 
             {/* icon container 25×25: no token */}
