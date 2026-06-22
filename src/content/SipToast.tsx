@@ -6,19 +6,31 @@ import { BottleColor, BottleType, type SipPrefs } from '../types/prefs'
 const DISMISS_MS = 8_000
 const FADE_MS    = 200
 
-const BOTTLE_COLOR: Record<BottleColor, string> = {
-  [BottleColor.Pink]:   '#FC7792',
-  [BottleColor.Orange]: '#F47E47',
-  [BottleColor.Yellow]: '#F2CE33',
-  [BottleColor.Green]:  '#00B97D',
-  [BottleColor.Blue]:   '#5FB2EB',
-  [BottleColor.Purple]: '#B938F6',
-}
-
-const BOTTLE_FILE: Record<BottleType, string> = {
-  [BottleType.Classic]: 'yetti.svg',
-  [BottleType.Wide]:    'bibs.svg',
-  [BottleType.Sport]:   'camelbak.svg',
+const BOTTLE_FILE: Record<BottleType, Record<BottleColor, string>> = {
+  [BottleType.Classic]: {
+    [BottleColor.Red]:    '1.1-yeti-red.png',
+    [BottleColor.Orange]: '1.2-yeti-orange.png',
+    [BottleColor.Yellow]: '1.3-yeti-yellow.png',
+    [BottleColor.Green]:  '1.4-yeti-green.png',
+    [BottleColor.Blue]:   '1.5-yeti-blue.png',
+    [BottleColor.Purple]: '1.6-yeti-purple.png',
+  },
+  [BottleType.Sport]: {
+    [BottleColor.Red]:    '2.1-camelbak-red.png',
+    [BottleColor.Orange]: '2.2-camelbak-orange.png',
+    [BottleColor.Yellow]: '2.3-camelbak-yellow.png',
+    [BottleColor.Green]:  '2.4-camelbak-green.png',
+    [BottleColor.Blue]:   '2.5-camelbak-blue.png',
+    [BottleColor.Purple]: '2.6-camelbak-purple.png',
+  },
+  [BottleType.Wide]: {
+    [BottleColor.Red]:    '3.1-bibs-red.png',
+    [BottleColor.Orange]: '3.2-bibs-orange.png',
+    [BottleColor.Yellow]: '3.3-bibs-yellow.png',
+    [BottleColor.Green]:  '3.4-bibs-green.png',
+    [BottleColor.Blue]:   '3.5-bibs-blue.png',
+    [BottleColor.Purple]: '3.6-bibs-purple.png',
+  },
 }
 
 function resolveIsDark(theme: SipPrefs['theme']): boolean {
@@ -33,8 +45,7 @@ interface Props { prefs: SipPrefs; onDismiss: () => void; mode?: 'live' | 'previ
 
 export default function SipToast({ prefs, onDismiss, mode = 'live' }: Props) {
   const [out, setOut] = useState(false)
-  const dark        = resolveIsDark(prefs.theme)
-  const bottleColor = BOTTLE_COLOR[prefs.bottleColor]
+  const dark = resolveIsDark(prefs.theme)
 
   useEffect(() => {
     const fade   = setTimeout(() => setOut(true), DISMISS_MS - FADE_MS)
@@ -63,7 +74,7 @@ export default function SipToast({ prefs, onDismiss, mode = 'live' }: Props) {
         <div className="sip-toast-left">
 
           {/* bottle */}
-          <BottleIcon color={bottleColor} type={prefs.bottleType} />
+          <BottleIcon type={prefs.bottleType} color={prefs.bottleColor} />
 
           {/* main content */}
           <div className="sip-toast-content">
@@ -169,22 +180,13 @@ function XIcon() {
 // mix-blend-mode:color overlays the user's selected color onto the photographic
 // SVG while preserving luminance — keeps the bottle realistic but tinted.
 
-function BottleIcon({ color, type }: { color: string; type: BottleType }) {
-  const src = chrome.runtime.getURL(`bottles/${BOTTLE_FILE[type]}`)
+function BottleIcon({ type, color }: { type: BottleType; color: BottleColor }) {
+  const src = chrome.runtime.getURL(`bottles/${BOTTLE_FILE[type][color]}`)
   return (
-    <div style={{ position: 'relative', width: 24, height: 60, flexShrink: 0, isolation: 'isolate' }}>
-      <img
-        src={src}
-        alt=""
-        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-      />
-      <div style={{
-        position: 'absolute', inset: 0,
-        backgroundColor: color,
-        mixBlendMode: 'color',
-        opacity: 0.55,
-        pointerEvents: 'none',
-      }} />
-    </div>
+    <img
+      src={src}
+      alt=""
+      style={{ width: 24, height: 60, objectFit: 'contain', display: 'block', flexShrink: 0 }}
+    />
   )
 }

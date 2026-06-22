@@ -5,7 +5,7 @@ export enum BottleType {
 }
 
 export enum BottleColor {
-  Pink   = 'pink',
+  Red    = 'red',
   Orange = 'orange',
   Yellow = 'yellow',
   Green  = 'green',

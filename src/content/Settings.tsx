@@ -8,7 +8,7 @@ import SipToast from './SipToast'
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const BOTTLE_COLORS: Record<BottleColor, string> = {
-  [BottleColor.Pink]:   '#FC7792',
+  [BottleColor.Red]:    '#E8362D',
   [BottleColor.Orange]: '#F47E47',
   [BottleColor.Yellow]: '#F2CE33',
   [BottleColor.Green]:  '#00B97D',
@@ -16,22 +16,43 @@ const BOTTLE_COLORS: Record<BottleColor, string> = {
   [BottleColor.Purple]: '#B938F6',
 }
 
-const BOTTLE_FILES: Record<BottleType, string> = {
-  [BottleType.Classic]: 'yetti.svg',
-  [BottleType.Wide]:    'bibs.svg',
-  [BottleType.Sport]:   'camelbak.svg',
+const BOTTLE_FILES: Record<BottleType, Record<BottleColor, string>> = {
+  [BottleType.Classic]: {
+    [BottleColor.Red]:    '1.1-yeti-red.png',
+    [BottleColor.Orange]: '1.2-yeti-orange.png',
+    [BottleColor.Yellow]: '1.3-yeti-yellow.png',
+    [BottleColor.Green]:  '1.4-yeti-green.png',
+    [BottleColor.Blue]:   '1.5-yeti-blue.png',
+    [BottleColor.Purple]: '1.6-yeti-purple.png',
+  },
+  [BottleType.Sport]: {
+    [BottleColor.Red]:    '2.1-camelbak-red.png',
+    [BottleColor.Orange]: '2.2-camelbak-orange.png',
+    [BottleColor.Yellow]: '2.3-camelbak-yellow.png',
+    [BottleColor.Green]:  '2.4-camelbak-green.png',
+    [BottleColor.Blue]:   '2.5-camelbak-blue.png',
+    [BottleColor.Purple]: '2.6-camelbak-purple.png',
+  },
+  [BottleType.Wide]: {
+    [BottleColor.Red]:    '3.1-bibs-red.png',
+    [BottleColor.Orange]: '3.2-bibs-orange.png',
+    [BottleColor.Yellow]: '3.3-bibs-yellow.png',
+    [BottleColor.Green]:  '3.4-bibs-green.png',
+    [BottleColor.Blue]:   '3.5-bibs-blue.png',
+    [BottleColor.Purple]: '3.6-bibs-purple.png',
+  },
 }
 
 const COLOR_ORDER: BottleColor[] = [
-  BottleColor.Pink, BottleColor.Orange, BottleColor.Yellow,
-  BottleColor.Green, BottleColor.Blue,  BottleColor.Purple,
+  BottleColor.Red, BottleColor.Orange, BottleColor.Yellow,
+  BottleColor.Green, BottleColor.Blue, BottleColor.Purple,
 ]
 const TYPE_ORDER: BottleType[] = [BottleType.Classic, BottleType.Wide, BottleType.Sport]
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function bottleSrc(type: BottleType) {
-  return chrome.runtime.getURL(`bottles/${BOTTLE_FILES[type]}`)
+function bottleSrc(type: BottleType, color: BottleColor) {
+  return chrome.runtime.getURL(`bottles/${BOTTLE_FILES[type][color]}`)
 }
 
 function resolveIsDark(theme: SipPrefs['theme']): boolean {
@@ -217,13 +238,13 @@ export default function Settings({ onClose }: Props) {
 
             {/* large preview — 250×250 with 50px inner padding */}
             <div
-              className="bg-surface-base border-0.5 border-border-default rounded-md shadow-subtle flex items-center justify-center overflow-clip p-pad-xxl"
+              className="bg-surface-base border-0.5 border-border-default rounded-md shadow-subtle flex items-center justify-center overflow-clip p-space-padding-xl"
               style={{ width: 250, height: 250 }}
             >
               <img
-                src={bottleSrc(prefs.bottleType)}
+                src={bottleSrc(prefs.bottleType, prefs.bottleColor)}
                 alt=""
-                style={{ height: 130, width: 'auto', objectFit: 'contain', display: 'block' }}
+                style={{ height: 200, width: 'auto', objectFit: 'contain', display: 'block' }}
               />
             </div>
 
@@ -242,7 +263,7 @@ export default function Settings({ onClose }: Props) {
                     }`}
                     style={{ width: 75, height: 75 }}
                   >
-                    <img src={bottleSrc(type)} alt={type} style={{ height: 50, width: 'auto', objectFit: 'contain', display: 'block' }} />
+                    <img src={bottleSrc(type, prefs.bottleColor)} alt={type} style={{ height: 50, width: 'auto', objectFit: 'contain', display: 'block' }} />
                   </button>
                 ))}
               </div>
@@ -428,8 +449,7 @@ export default function Settings({ onClose }: Props) {
 // ─── toast preview (visual-only, no dismiss logic) ────────────────────────────
 
 function ToastPreview({ prefs, dark }: { prefs: SipPrefs; dark: boolean }) {
-  const bottleColor = BOTTLE_COLORS[prefs.bottleColor]
-  const src = bottleSrc(prefs.bottleType)
+  const src = bottleSrc(prefs.bottleType, prefs.bottleColor)
 
   return (
     <div className="w-[450px] bg-surface-elevated border-0.5 border-border-default rounded-xl shadow p-pad-xl flex flex-col overflow-clip">
@@ -440,11 +460,8 @@ function ToastPreview({ prefs, dark }: { prefs: SipPrefs; dark: boolean }) {
         {/* toast-left: bottle + main content */}
         <div className="flex flex-1 min-w-0 gap-pad-xl items-start">
 
-          {/* bottle with color tint */}
-          <div style={{ position: 'relative', width: 24, height: 60, flexShrink: 0, isolation: 'isolate' }}>
-            <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-            <div style={{ position: 'absolute', inset: 0, backgroundColor: bottleColor, mixBlendMode: 'color', opacity: 0.55, pointerEvents: 'none' }} />
-          </div>
+          {/* bottle */}
+          <img src={src} alt="" style={{ width: 24, height: 60, objectFit: 'contain', display: 'block', flexShrink: 0 }} />
 
           {/* main content */}
           <div className="flex flex-1 min-w-0 flex-col gap-pad-xl">
