@@ -1,0 +1,14 @@
+@import '@sip/ui/tokens.css';
+@import '@sip/ui/toast-styles.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  background: var(--surface-base);
+}
+
+body {
+  margin: 0;
+}

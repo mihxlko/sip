@@ -1,7 +1,0 @@
-/*
-  Tailwind utilities injected into the toast shadow DOM.
-  No @tailwind base — Preflight reset is not wanted inside a shadow root.
-  CSS custom properties (tokens) inherit from the host page's :root
-  automatically, so tokens.css does not need to be repeated here.
-*/
-@tailwind utilities;
