@@ -20,13 +20,19 @@ export default function SipToast({ platform, prefs, onDismiss, mode = 'live' }: 
   const [out, setOut] = useState(false)
   const dark = resolveIsDark(prefs.theme)
 
+  // In 'preview' mode Sonner owns both the auto-dismiss timer (via the
+  // `duration` option) and the enter/exit animation, so the manual
+  // fade-then-remove dance below is 'live'-only — running it in preview
+  // would double-animate against Sonner's own exit transition.
   useEffect(() => {
+    if (mode === 'preview') return
     const fade   = setTimeout(() => setOut(true), DISMISS_MS - FADE_MS)
     const remove = setTimeout(onDismiss,           DISMISS_MS)
     return () => { clearTimeout(fade); clearTimeout(remove) }
-  }, [onDismiss])
+  }, [onDismiss, mode])
 
   function dismiss() {
+    if (mode === 'preview') { onDismiss(); return }
     setOut(true)
     setTimeout(onDismiss, FADE_MS)
   }
@@ -38,7 +44,7 @@ export default function SipToast({ platform, prefs, onDismiss, mode = 'live' }: 
   }
 
   return (
-    <div className={`${out ? 'toast out' : 'toast'} sip-toast`}>
+    <div className={mode === 'preview' ? 'sip-toast' : `${out ? 'toast out' : 'toast'} sip-toast`}>
 
       {/* ── inner row: toast-left + close × ── */}
       <div className="sip-toast-row">

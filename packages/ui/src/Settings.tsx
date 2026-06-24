@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Toaster, toast as sonnerToast } from 'sonner'
 import {
   BottleColor, BottleType, DEFAULT_PREFS, type SipPlatform, type SipPrefs,
 } from '@sip/types'
@@ -20,6 +21,10 @@ const COLOR_ORDER: BottleColor[] = [
   BottleColor.Green, BottleColor.Blue, BottleColor.Purple,
 ]
 const TYPE_ORDER: BottleType[] = [BottleType.Classic, BottleType.Wide, BottleType.Sport]
+
+// Monospace so the invisible real <input>'s glyph advances line up exactly
+// with the 1ch-wide animated overlay spans drawn on top of it.
+const CLOCK_MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,10 +50,15 @@ interface Props { platform: SipPlatform; onClose: () => void }
 export default function Settings({ platform, onClose }: Props) {
   const [prefs, setPrefsState] = useState<SipPrefs>(DEFAULT_PREFS)
   const [clockInput, setClockInput] = useState('00:15')
-  const [showTestToast, setShowTestToast] = useState(false)
-  const [toastKey, setToastKey] = useState(0)
+  // What the overlay actually renders. Normally mirrors clockInput, but when
+  // a character is deleted this lags behind by one animation tick so the
+  // removed character's span stays mounted long enough to play its leave
+  // animation instead of just vanishing the instant the value shrinks.
+  const [overlayValue, setOverlayValue] = useState('00:15')
+  const [clockAnim, setClockAnim] = useState<Record<number, { nonce: number; mode: 'enter' | 'leave' }>>({})
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
   const clockTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const overlayShrinkRef = useRef<ReturnType<typeof setTimeout>>()
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -59,6 +69,7 @@ export default function Settings({ platform, onClose }: Props) {
         const h = String(Math.floor(p.intervalMinutes / 60)).padStart(2, '0')
         const m = String(p.intervalMinutes % 60).padStart(2, '0')
         setClockInput(`${h}:${m}`)
+        setOverlayValue(`${h}:${m}`)
       }
     })
     return () => { live = false }
@@ -102,6 +113,20 @@ export default function Settings({ platform, onClose }: Props) {
     return total
   }
 
+  function bumpClockAnim(i: number, mode: 'enter' | 'leave') {
+    setClockAnim(prev => ({ ...prev, [i]: { nonce: (prev[i]?.nonce ?? 0) + 1, mode } }))
+  }
+
+  // Diffs character-by-character (digits and the colon both count as
+  // positions) so any index whose character changed — typed, deleted, or
+  // shifted by an insert elsewhere in the string — gets its own pop.
+  function animateClockDiff(prev: string, next: string) {
+    const len = Math.max(prev.length, next.length)
+    for (let i = 0; i < len; i++) {
+      if (prev[i] !== next[i]) bumpClockAnim(i, next[i] !== undefined ? 'enter' : 'leave')
+    }
+  }
+
   function handleClockChange(e: React.ChangeEvent<HTMLInputElement>) {
     let val = e.target.value.replace(/[^0-9:]/g, '')
     const digits = val.replace(/:/g, '')
@@ -109,7 +134,19 @@ export default function Settings({ platform, onClose }: Props) {
       val = digits.slice(0, 2) + ':' + digits.slice(2)
     }
     val = val.slice(0, 5)
+
+    animateClockDiff(clockInput, val)
     setClockInput(val)
+
+    clearTimeout(overlayShrinkRef.current)
+    if (val.length >= overlayValue.length) {
+      setOverlayValue(val)
+    } else {
+      // Hold the longer (pre-edit) string in the overlay for one leave
+      // animation's worth of time so the deleted character visibly shrinks
+      // away instead of disappearing the instant the value gets shorter.
+      overlayShrinkRef.current = setTimeout(() => setOverlayValue(val), 200)
+    }
 
     clearTimeout(clockTimerRef.current)
     clockTimerRef.current = setTimeout(() => {
@@ -120,6 +157,7 @@ export default function Settings({ platform, onClose }: Props) {
 
   function handleClockBlur() {
     clearTimeout(clockTimerRef.current)
+    clearTimeout(overlayShrinkRef.current)
     const mins = parseClockInput(clockInput)
     if (mins !== null) {
       update({ intervalMinutes: mins })
@@ -127,6 +165,7 @@ export default function Settings({ platform, onClose }: Props) {
       const h = String(Math.floor(prefs.intervalMinutes / 60)).padStart(2, '0')
       const m = String(prefs.intervalMinutes % 60).padStart(2, '0')
       setClockInput(`${h}:${m}`)
+      setOverlayValue(`${h}:${m}`)
     }
   }
 
@@ -135,8 +174,14 @@ export default function Settings({ platform, onClose }: Props) {
   }
 
   function testToast() {
-    setToastKey(k => k + 1)
-    setShowTestToast(true)
+    sonnerToast.custom((id) => (
+      <SipToast
+        platform={platform}
+        prefs={prefs}
+        onDismiss={() => sonnerToast.dismiss(id)}
+        mode="preview"
+      />
+    ), { duration: 8000 })
   }
 
   function pickIcon() {
@@ -157,11 +202,24 @@ export default function Settings({ platform, onClose }: Props) {
 
   return (
     <>
-    {showTestToast && (
-      <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}>
-        <SipToast key={toastKey} platform={platform} prefs={prefs} onDismiss={() => setShowTestToast(false)} mode="preview" />
-      </div>
-    )}
+    <style>{`
+      @keyframes sip-digit-pop-in {
+        0%   { transform: scale(0.4) translateY(8px); opacity: 0.3; }
+        100% { transform: scale(1) translateY(0); opacity: 1; }
+      }
+      @keyframes sip-digit-pop-out {
+        0%   { transform: scale(0.4) translateY(8px); opacity: 0.3; }
+        100% { transform: scale(1) translateY(0); opacity: 1; }
+      }
+      .sip-digit-pop-in  { animation: sip-digit-pop-in 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+      .sip-digit-pop-out { animation: sip-digit-pop-out 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    `}</style>
+    <Toaster
+      position="top-right"
+      offset="16px"
+      visibleToasts={3}
+      toastOptions={{ unstyled: true }}
+    />
     {/* content root — also the data-theme target for token cascade into children */}
     <div
       ref={modalRef}
@@ -305,20 +363,45 @@ export default function Settings({ platform, onClose }: Props) {
           <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Time</span>
 
-            <input
-              type="text"
-              value={clockInput}
-              onChange={handleClockChange}
-              onBlur={handleClockBlur}
-              onKeyDown={handleClockKeyDown}
-              placeholder="HH:MM"
-              maxLength={5}
-              className="border-0.5 border-border-default rounded-lg shadow-subtle px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-transparent font-sans appearance-none focus:border-1.5 focus:border-border-focus"
-            />
+            {/* One real <input> drives normal typing/cursor/selection; an
+                inset-0 overlay underneath renders the same characters with
+                the pop animation. Both use a monospace font + 1ch-wide cells
+                so the (invisible) input's glyph positions and the overlay's
+                spans always line up. */}
+            <div className="relative bg-surface-primary border-0.5 border-border-default rounded-lg shadow-subtle focus-within:border-[1.5px] focus-within:border-border-focus">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 flex items-center justify-center px-pad-md py-pad-md"
+                style={{ fontFamily: CLOCK_MONO_FONT }}
+              >
+                {overlayValue.split('').map((ch, i) => (
+                  <span
+                    key={`${i}-${clockAnim[i]?.nonce ?? 0}`}
+                    className={`text-xl font-semibold leading-tight text-text-primary ${
+                      clockAnim[i]?.mode === 'enter' ? 'sip-digit-pop-in' : clockAnim[i]?.mode === 'leave' ? 'sip-digit-pop-out' : ''
+                    }`}
+                    style={{ width: '1ch', display: 'inline-block', textAlign: 'center' }}
+                  >
+                    {ch}
+                  </span>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={clockInput}
+                onChange={handleClockChange}
+                onBlur={handleClockBlur}
+                onKeyDown={handleClockKeyDown}
+                placeholder="HH:MM"
+                maxLength={5}
+                className="relative z-10 w-full bg-transparent border-0 rounded-lg px-pad-md py-pad-md text-xl font-semibold leading-tight text-center outline-none appearance-none font-sans placeholder:text-text-tertiary"
+                style={{ fontFamily: CLOCK_MONO_FONT, color: 'transparent', caretColor: 'var(--text-primary)' }}
+              />
+            </div>
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
               <span className="text-text-muted text-md font-medium shrink-0">Every:</span>
-              <div className="flex-1 self-stretch border-0.5 border-border-default rounded-xs shadow-subtle flex items-center">
+              <div className="flex-1 self-stretch rounded-xs shadow-subtle flex items-center">
                 <span className="text-md font-medium text-text-primary">{fmtInterval(prefs.intervalMinutes)}</span>
               </div>
             </div>
