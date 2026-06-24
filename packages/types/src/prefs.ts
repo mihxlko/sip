@@ -29,8 +29,8 @@ export interface SipPrefs {
 export const DEFAULT_PREFS: Readonly<SipPrefs> = {
   bottleType:      BottleType.Classic,
   bottleColor:     BottleColor.Blue,
-  titleText:       'Time to SIP! 💧',
-  messageText:     'Stay hydrated — drink a glass of water now.',
+  titleText:       'Drink Up!',
+  messageText:     'Sending you a friendly reminder to drink some water.',
   intervalMinutes: 15,
   customIcon:      null,
   showLogo:        true,

@@ -165,11 +165,11 @@ export default function Settings({ platform, onClose }: Props) {
     {/* content root — also the data-theme target for token cascade into children */}
     <div
       ref={modalRef}
-      className="w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base"
+      className="relative w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base p-gap-lg"
     >
 
         {/* ── header ── */}
-        <div className="flex items-start justify-between">
+        <div className="absolute top-0 left-0 right-0 z-10 flex items-start justify-between">
           <SipBadge width={39} gradId="sip-ov-hdr" />
           <button
             onClick={onClose}
@@ -184,7 +184,7 @@ export default function Settings({ platform, onClose }: Props) {
         <div className="w-full max-w-[850px] mx-auto flex flex-col gap-gap-lg">
 
         {/* ── preview panel ── */}
-        <div className="bg-surface-primary rounded-lg shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg">
+        <div className="bg-surface-primary rounded-xxl shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg">
           <ToastPreview platform={platform} prefs={prefs} dark={dark} />
           {/* Test button: rounded-full = design's 25px radius — no exact token */}
           <button
@@ -199,12 +199,12 @@ export default function Settings({ platform, onClose }: Props) {
         <div className="flex flex-row gap-gap-lg items-stretch">
 
           {/* bottle card — flex-1: takes leftover space after the content-sized right column */}
-          <div className="flex-1 bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
+          <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
             <span className="text-text-secondary text-md font-medium px-[2px]">Bottle</span>
 
             {/* large preview — 250×250 with 50px inner padding */}
             <div
-              className="bg-surface-base border-0.5 border-border-default rounded-md shadow-subtle flex items-center justify-center overflow-clip p-space-padding-xl"
+              className="bg-surface-base border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center overflow-clip p-space-padding-xl"
               style={{ width: 250, height: 250 }}
             >
               <img
@@ -215,7 +215,7 @@ export default function Settings({ platform, onClose }: Props) {
             </div>
 
             {/* type thumbnails — 75×75 (1:1) */}
-            <div className="flex flex-col gap-gap-md">
+            <div className="flex flex-col gap-gap-md p-pad-md">
               <span className="text-text-muted text-md font-medium px-[2px]">Type</span>
               <div className="flex justify-between">
                 {TYPE_ORDER.map(type => (
@@ -236,7 +236,7 @@ export default function Settings({ platform, onClose }: Props) {
             </div>
 
             {/* color swatches — 38×38 */}
-            <div className="flex flex-col gap-gap-md">
+            <div className="flex flex-col gap-gap-md p-pad-md">
               <span className="text-text-muted text-md font-medium px-[2px]">Color</span>
               <div className="flex justify-between">
                 {COLOR_ORDER.map(color => (
@@ -264,7 +264,7 @@ export default function Settings({ platform, onClose }: Props) {
           <div className="flex flex-col gap-gap-lg justify-between">
 
           {/* text card */}
-          <div className="w-full bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
+          <div className="w-full bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium px-[8px]">Text</span>
 
             <div className="flex flex-col gap-xs">
@@ -278,7 +278,7 @@ export default function Settings({ platform, onClose }: Props) {
                 value={prefs.titleText}
                 maxLength={40}
                 onChange={e => update({ titleText: e.target.value })}
-                className="bg-surface-primary border-0.5 border-border-default rounded-xs shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none focus:border-1.5 focus:border-border-focus"
+                className="bg-surface-primary border-0.5 border-border-default rounded-md shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none focus:border-1.5 focus:border-border-focus"
               />
             </div>
 
@@ -292,7 +292,7 @@ export default function Settings({ platform, onClose }: Props) {
                 value={prefs.messageText}
                 maxLength={60}
                 onChange={e => update({ messageText: e.target.value })}
-                className="bg-surface-primary border-0.5 border-border-default rounded-xs shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none focus:border-1.5 focus:border-border-focus"
+                className="bg-surface-primary border-0.5 border-border-default rounded-md shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none focus:border-1.5 focus:border-border-focus"
                 style={{ height: 72 }}
               />
             </div>
@@ -302,7 +302,7 @@ export default function Settings({ platform, onClose }: Props) {
           <div className="flex flex-row gap-gap-lg items-start">
 
           {/* time card */}
-          <div className="flex-1 bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
+          <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Time</span>
 
             <input
@@ -313,25 +313,25 @@ export default function Settings({ platform, onClose }: Props) {
               onKeyDown={handleClockKeyDown}
               placeholder="HH:MM"
               maxLength={5}
-              className="border-0.5 border-border-default rounded-sm shadow-subtle px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-transparent font-sans appearance-none focus:border-1.5 focus:border-border-focus"
+              className="border-0.5 border-border-default rounded-lg shadow-subtle px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-transparent font-sans appearance-none focus:border-1.5 focus:border-border-focus"
             />
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
               <span className="text-text-muted text-md font-medium shrink-0">Every:</span>
-              <div className="flex-1 self-stretch bg-surface-base border-0.5 border-border-default rounded-xs shadow-subtle px-pad-md py-xs flex items-center">
+              <div className="flex-1 self-stretch border-0.5 border-border-default rounded-xs shadow-subtle flex items-center">
                 <span className="text-md font-medium text-text-primary">{fmtInterval(prefs.intervalMinutes)}</span>
               </div>
             </div>
           </div>
 
           {/* icon card — w-[130px]: fixed width, natural content height */}
-          <div className="w-[130px] shrink-0 bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
+          <div className="w-[130px] shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Icon</span>
 
             {/* 100×100 preview — no token */}
             <div className="flex flex-col items-center gap-xs">
               <div
-                className="border-0.5 border-border-default rounded-md shadow-subtle flex items-center justify-center bg-surface-elevated"
+                className="border-0.5 border-border-default rounded-lg shadow-subtle flex items-center justify-center bg-surface-base"
                 style={{ width: 100, height: 100 }}
               >
                 {prefs.customIcon
@@ -371,16 +371,16 @@ export default function Settings({ platform, onClose }: Props) {
           </div>
 
           {/* appearance card — w-[130px]: no token, matches popup */}
-          <div className="w-[130px] shrink-0 bg-surface-primary rounded-lg shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
+          <div className="w-[130px] shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Appearance</span>
 
             {/* icon container 25×25: no token */}
-            <div className="border-0.5 border-border-default rounded-md shadow-subtle flex flex-col gap-xs p-xs">
+            <div className="border-0.5 border-border-default rounded-lg shadow-subtle flex flex-col gap-xs p-xs">
               {(['system', 'light', 'dark'] as const).map(theme => (
                 <button
                   key={theme}
                   onClick={() => update({ theme })}
-                  className={`group cursor-pointer flex items-center gap-pad-md rounded-md px-xs py-xs border-0 outline-none appearance-none w-full ${
+                  className={`group cursor-pointer flex items-center gap-pad-md rounded-sm px-xs py-xs border-0 outline-none appearance-none w-full ${
                     prefs.theme === theme
                       ? 'bg-state-selected text-text-secondary'
                       : 'bg-transparent text-text-tertiary hover:bg-state-hover hover:text-text-secondary'
