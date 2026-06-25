@@ -22,10 +22,6 @@ const COLOR_ORDER: BottleColor[] = [
 ]
 const TYPE_ORDER: BottleType[] = [BottleType.Classic, BottleType.Wide, BottleType.Sport]
 
-// Monospace so the invisible real <input>'s glyph advances line up exactly
-// with the 1ch-wide animated overlay spans drawn on top of it.
-const CLOCK_MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
-
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function resolveIsDark(theme: SipPrefs['theme']): boolean {
@@ -49,16 +45,12 @@ interface Props { platform: SipPlatform; onClose: () => void }
 
 export default function Settings({ platform, onClose }: Props) {
   const [prefs, setPrefsState] = useState<SipPrefs>(DEFAULT_PREFS)
-  const [clockInput, setClockInput] = useState('00:15')
-  // What the overlay actually renders. Normally mirrors clockInput, but when
-  // a character is deleted this lags behind by one animation tick so the
-  // removed character's span stays mounted long enough to play its leave
-  // animation instead of just vanishing the instant the value shrinks.
-  const [overlayValue, setOverlayValue] = useState('00:15')
-  const [clockAnim, setClockAnim] = useState<Record<number, { nonce: number; mode: 'enter' | 'leave' }>>({})
+  const [digits, setDigits] = useState('0015')
+  const [slotAnim, setSlotAnim] = useState<Record<number, { nonce: number; mode: 'enter' | 'leave' }>>({})
+  const [digitsFocused, setDigitsFocused] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
   const clockTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const overlayShrinkRef = useRef<ReturnType<typeof setTimeout>>()
+  const digitsInputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -68,8 +60,7 @@ export default function Settings({ platform, onClose }: Props) {
         setPrefsState(p)
         const h = String(Math.floor(p.intervalMinutes / 60)).padStart(2, '0')
         const m = String(p.intervalMinutes % 60).padStart(2, '0')
-        setClockInput(`${h}:${m}`)
-        setOverlayValue(`${h}:${m}`)
+        setDigits(`${h}${m}`)
       }
     })
     return () => { live = false }
@@ -101,11 +92,27 @@ export default function Settings({ platform, onClose }: Props) {
     })
   }
 
-  function parseClockInput(s: string): number | null {
-    const match = s.match(/^(\d{1,2}):(\d{2})$/)
-    if (!match) return null
-    const h = parseInt(match[1], 10)
-    const m = parseInt(match[2], 10)
+  // Truncates at the first digit that would make the time invalid, rather
+  // than clamping it — so typing a disallowed digit simply has no effect,
+  // same as a native input rejecting a keystroke.
+  function clampDigits(raw: string): string {
+    let out = ''
+    for (let i = 0; i < raw.length; i++) {
+      const d = raw[i]
+      if (i === 0 && d > '2') break
+      // hour can go up to 24 (tens digit '2' allows ones up to '4')
+      if (i === 1 && out[0] === '2' && d > '4') break
+      if (i === 2 && d > '5') break
+      out += d
+    }
+    return out
+  }
+
+  // Times are bounded to 00:01–24:00 — 24:00 is only valid with :00 minutes.
+  function parseDigits(s: string): number | null {
+    if (s.length !== 4) return null
+    const h = parseInt(s.slice(0, 2), 10)
+    const m = parseInt(s.slice(2, 4), 10)
     if (h > 24 || m > 59) return null
     if (h === 24 && m !== 0) return null
     const total = h * 60 + m
@@ -113,64 +120,77 @@ export default function Settings({ platform, onClose }: Props) {
     return total
   }
 
-  function bumpClockAnim(i: number, mode: 'enter' | 'leave') {
-    setClockAnim(prev => ({ ...prev, [i]: { nonce: (prev[i]?.nonce ?? 0) + 1, mode } }))
+  function bumpSlotAnim(i: number, mode: 'enter' | 'leave') {
+    setSlotAnim(prev => ({ ...prev, [i]: { nonce: (prev[i]?.nonce ?? 0) + 1, mode } }))
   }
 
-  // Diffs character-by-character (digits and the colon both count as
-  // positions) so any index whose character changed — typed, deleted, or
-  // shifted by an insert elsewhere in the string — gets its own pop.
-  function animateClockDiff(prev: string, next: string) {
-    const len = Math.max(prev.length, next.length)
-    for (let i = 0; i < len; i++) {
-      if (prev[i] !== next[i]) bumpClockAnim(i, next[i] !== undefined ? 'enter' : 'leave')
+  function diffDigits(prev: string, next: string) {
+    for (let i = 0; i < 4; i++) {
+      if (prev[i] !== next[i]) bumpSlotAnim(i, next[i] !== undefined ? 'enter' : 'leave')
     }
   }
 
-  function handleClockChange(e: React.ChangeEvent<HTMLInputElement>) {
-    let val = e.target.value.replace(/[^0-9:]/g, '')
-    const digits = val.replace(/:/g, '')
-    if (digits.length >= 2 && !val.includes(':')) {
-      val = digits.slice(0, 2) + ':' + digits.slice(2)
-    }
-    val = val.slice(0, 5)
-
-    animateClockDiff(clockInput, val)
-    setClockInput(val)
-
-    clearTimeout(overlayShrinkRef.current)
-    if (val.length >= overlayValue.length) {
-      setOverlayValue(val)
-    } else {
-      // Hold the longer (pre-edit) string in the overlay for one leave
-      // animation's worth of time so the deleted character visibly shrinks
-      // away instead of disappearing the instant the value gets shorter.
-      overlayShrinkRef.current = setTimeout(() => setOverlayValue(val), 200)
-    }
+  function handleDigitsChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = clampDigits(e.target.value.replace(/\D/g, '').slice(0, 4))
+    diffDigits(digits, raw)
+    setDigits(raw)
 
     clearTimeout(clockTimerRef.current)
     clockTimerRef.current = setTimeout(() => {
-      const mins = parseClockInput(val)
+      const mins = parseDigits(raw)
       if (mins !== null) update({ intervalMinutes: mins })
     }, 500)
   }
 
-  function handleClockBlur() {
+  function handleDigitsBlur() {
     clearTimeout(clockTimerRef.current)
-    clearTimeout(overlayShrinkRef.current)
-    const mins = parseClockInput(clockInput)
+    setDigitsFocused(false)
+    const mins = parseDigits(digits)
     if (mins !== null) {
       update({ intervalMinutes: mins })
     } else {
       const h = String(Math.floor(prefs.intervalMinutes / 60)).padStart(2, '0')
       const m = String(prefs.intervalMinutes % 60).padStart(2, '0')
-      setClockInput(`${h}:${m}`)
-      setOverlayValue(`${h}:${m}`)
+      setDigits(`${h}${m}`)
     }
   }
 
-  function handleClockKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleDigitsKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') e.currentTarget.blur()
+  }
+
+  // The hidden input's text is invisible, so the native caret lands wherever
+  // its real (tiny) glyphs happen to be — not at the slot the user actually
+  // clicked. This is an append/backspace-only field, so every click should
+  // just put the caret at the end, regardless of which slot was clicked.
+  function handleDigitsClick(e: React.MouseEvent<HTMLInputElement>) {
+    const el = e.currentTarget
+    el.setSelectionRange(el.value.length, el.value.length)
+  }
+
+  function renderDigitSlot(i: number) {
+    const char = digits[i]
+    const filled = char !== undefined
+    const active = digitsFocused && i === Math.min(digits.length, 3)
+    const anim = slotAnim[i]
+    return (
+      <div
+        key={i}
+        className={`bg-surface-primary border-0.5 rounded-lg shadow-subtle flex items-center justify-center ${
+          active ? 'border-border-focus' : 'border-border-default'
+        }`}
+        style={{ width: 44, height: 52 }}
+      >
+        <span
+          key={anim?.nonce ?? 0}
+          className={`text-xl font-semibold leading-none ${filled ? 'text-text-primary' : 'text-text-tertiary'} ${
+            anim?.mode === 'enter' ? 'sip-digit-pop-in' : anim?.mode === 'leave' ? 'sip-digit-pop-out' : ''
+          }`}
+        >
+          {filled ? char : '0'}
+        </span>
+      </div>
+    )
   }
 
   function testToast() {
@@ -363,39 +383,30 @@ export default function Settings({ platform, onClose }: Props) {
           <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Time</span>
 
-            {/* One real <input> drives normal typing/cursor/selection; an
-                inset-0 overlay underneath renders the same characters with
-                the pop animation. Both use a monospace font + 1ch-wide cells
-                so the (invisible) input's glyph positions and the overlay's
-                spans always line up. */}
-            <div className="relative bg-surface-primary border-0.5 border-border-default rounded-lg shadow-subtle focus-within:border-[1.5px] focus-within:border-border-focus">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 flex items-center justify-center px-pad-md py-pad-md"
-                style={{ fontFamily: CLOCK_MONO_FONT }}
-              >
-                {overlayValue.split('').map((ch, i) => (
-                  <span
-                    key={`${i}-${clockAnim[i]?.nonce ?? 0}`}
-                    className={`text-xl font-semibold leading-tight text-text-primary ${
-                      clockAnim[i]?.mode === 'enter' ? 'sip-digit-pop-in' : clockAnim[i]?.mode === 'leave' ? 'sip-digit-pop-out' : ''
-                    }`}
-                    style={{ width: '1ch', display: 'inline-block', textAlign: 'center' }}
-                  >
-                    {ch}
-                  </span>
-                ))}
-              </div>
+            {/* fixed-size slot divs (not text-driven width) so neither the
+                displayed digit nor the focus ring can change the row's
+                footprint; the hidden input sits on top so a tap/click
+                anywhere on the row focuses it natively. */}
+            <div className="relative flex items-center justify-center gap-xs" style={{ cursor: 'text' }}>
+              {renderDigitSlot(0)}
+              {renderDigitSlot(1)}
+              <span className="text-text-muted text-xl font-semibold px-[2px]">:</span>
+              {renderDigitSlot(2)}
+              {renderDigitSlot(3)}
               <input
+                ref={digitsInputRef}
                 type="text"
-                value={clockInput}
-                onChange={handleClockChange}
-                onBlur={handleClockBlur}
-                onKeyDown={handleClockKeyDown}
-                placeholder="HH:MM"
-                maxLength={5}
-                className="relative z-10 w-full bg-transparent border-0 rounded-lg px-pad-md py-pad-md text-xl font-semibold leading-tight text-center outline-none appearance-none font-sans placeholder:text-text-tertiary"
-                style={{ fontFamily: CLOCK_MONO_FONT, color: 'transparent', caretColor: 'var(--text-primary)' }}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={digits}
+                onChange={handleDigitsChange}
+                onFocus={() => setDigitsFocused(true)}
+                onBlur={handleDigitsBlur}
+                onKeyDown={handleDigitsKeyDown}
+                onClick={handleDigitsClick}
+                maxLength={4}
+                aria-label="Time"
+                className="absolute inset-0 w-full h-full opacity-0 border-0 outline-none appearance-none bg-transparent cursor-text"
               />
             </div>
 
@@ -510,7 +521,18 @@ function ToastPreview({ platform, prefs, dark }: { platform: SipPlatform; prefs:
         <div className="flex flex-1 min-w-0 gap-pad-xl items-start">
 
           {/* bottle */}
-          <img src={src} alt="" style={{ width: 24, height: 60, objectFit: 'contain', display: 'block', flexShrink: 0 }} />
+          <div style={{ position: 'relative', width: 24, height: 60, flexShrink: 0, isolation: 'isolate' }}>
+            <img
+              src={src}
+              alt=""
+              className="sip-bottle-shimmer"
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            />
+            <div
+              className="sip-bottle-shimmer-overlay"
+              style={{ WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` }}
+            />
+          </div>
 
           {/* main content */}
           <div className="flex flex-1 min-w-0 flex-col gap-pad-xl">

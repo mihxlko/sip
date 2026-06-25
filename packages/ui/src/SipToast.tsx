@@ -162,10 +162,17 @@ function XIcon() {
 function BottleIcon({ platform, type, color }: { platform: SipPlatform; type: BottleType; color: BottleColor }) {
   const src = platform.getBottleUrl(type, color)
   return (
-    <img
-      src={src}
-      alt=""
-      style={{ width: 24, height: 60, objectFit: 'contain', display: 'block', flexShrink: 0 }}
-    />
+    <div style={{ position: 'relative', width: 24, height: 60, flexShrink: 0, isolation: 'isolate' }}>
+      <img
+        src={src}
+        alt=""
+        className="sip-bottle-shimmer"
+        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+      />
+      <div
+        className="sip-bottle-shimmer-overlay"
+        style={{ WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` }}
+      />
+    </div>
   )
 }

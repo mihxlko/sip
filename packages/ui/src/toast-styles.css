@@ -136,6 +136,17 @@
   --sip-ease-out:       cubic-bezier(0.06, 0.59, 0.35, 1);
   --sip-enter-duration: 400ms;
   --sip-exit-duration:  200ms;
+
+  /* ── primitive: shimmer ────────────────────────────────────────────── */
+  --shimmer-hue-min: 0deg;
+  --shimmer-hue-max: 25deg;
+  --shimmer-hue-duration: 6s;
+
+  --shimmer-overlay-opacity-min: 0.03;
+  --shimmer-overlay-opacity-max: 0.12;
+  --shimmer-overlay-duration: 4s;
+
+  --shimmer-ease: ease-in-out;
 }
 
 [data-theme="dark"],
@@ -208,8 +219,37 @@
   to   { opacity: 0; transform: translateY(-100%)  scale(.98); }
 }
 
+@keyframes sip-shimmer-hue {
+  0%, 100% { filter: hue-rotate(var(--shimmer-hue-min)); }
+  50%      { filter: hue-rotate(var(--shimmer-hue-max)); }
+}
+
+@keyframes sip-shimmer-overlay {
+  0%, 100% { opacity: var(--shimmer-overlay-opacity-min); }
+  50%      { opacity: var(--shimmer-overlay-opacity-max); }
+}
+
 .toast     { animation: sip-in  var(--sip-enter-duration) var(--sip-ease-in)  both; pointer-events: auto; }
 .toast.out { animation: sip-out var(--sip-exit-duration)  var(--sip-ease-out) both; }
+
+.sip-bottle-shimmer {
+  animation: sip-shimmer-hue var(--shimmer-hue-duration) var(--shimmer-ease) infinite;
+}
+
+.sip-bottle-shimmer-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, transparent 50%, rgba(255, 255, 255, 0.4) 100%);
+  mix-blend-mode: overlay;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  animation: sip-shimmer-overlay var(--shimmer-overlay-duration) var(--shimmer-ease) infinite;
+}
 
 /* ── toast container ─────────────────────────────────────────────────────────
    Maps: w-[450px] bg-surface-elevated border-0.5 border-border-default
