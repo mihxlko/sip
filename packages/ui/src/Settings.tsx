@@ -176,10 +176,10 @@ export default function Settings({ platform, onClose }: Props) {
     return (
       <div
         key={i}
-        className={`bg-surface-primary border-0.5 rounded-lg shadow-subtle flex items-center justify-center ${
+        className={`bg-surface-primary border-0.5 rounded-lg shadow-subtle flex items-center justify-center p-pad-md ${
           active ? 'border-border-focus' : 'border-border-default'
         }`}
-        style={{ width: 44, height: 52 }}
+        style={{ minWidth: 44, minHeight: 52 }}
       >
         <span
           key={anim?.nonce ?? 0}

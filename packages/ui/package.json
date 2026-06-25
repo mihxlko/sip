@@ -11,7 +11,8 @@
     "./toast-styles.css": "./src/toast-styles.css"
   },
   "dependencies": {
-    "@sip/types": "*"
+    "@sip/types": "*",
+    "sonner": "^2.0.7"
   },
   "peerDependencies": {
     "react": "^18.3.1",
