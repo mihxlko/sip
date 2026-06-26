@@ -314,7 +314,7 @@ export default function Settings({ platform, onClose }: Props) {
               onKeyDown={handleClockKeyDown}
               placeholder="HH:MM"
               maxLength={5}
-              className="border-0.5 border-border-emphasis focus:border-border-focus rounded-xl shadow-subtle px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-transparent font-sans appearance-none"
+              className="border-0.5 border-border-emphasis focus:border-border-focus rounded-xl px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-transparent font-sans appearance-none"
             />
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
