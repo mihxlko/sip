@@ -70,6 +70,11 @@ function getBottleUrl(type: BottleType, color: BottleColor): string {
   return chrome.runtime.getURL(`bottles/${BOTTLE_FILES[type][color]}`)
 }
 
+function getIconUrl(size: 16 | 32 | 64 | 128, dark = false): string {
+  const name = dark ? `sip-icon-dark-${size}.png` : `sip-icon-${size}.png`
+  return chrome.runtime.getURL(`icons/${name}`)
+}
+
 // Routed through a message rather than chrome.tabs.create directly because
 // content scripts can call chrome.runtime.sendMessage but not chrome.tabs.*.
 function openSettings(): void {
@@ -81,5 +86,6 @@ export const chromePlatform: SipPlatform = {
   setPrefs,
   onPrefsChanged,
   getBottleUrl,
+  getIconUrl,
   openSettings,
 }

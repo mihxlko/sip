@@ -59,6 +59,10 @@ function getBottleUrl(type: BottleType, color: BottleColor): string {
   return `/bottles/${BOTTLE_FILES[type][color]}`
 }
 
+function getIconUrl(size: 16 | 32 | 64 | 128, dark = false): string {
+  return dark ? `/icons/sip-icon-dark-${size}.png` : `/icons/sip-icon-${size}.png`
+}
+
 // No-op: the web app's only page is the settings page itself.
 function openSettings(): void {}
 
@@ -67,5 +71,6 @@ export const webPlatform: SipPlatform = {
   setPrefs,
   onPrefsChanged,
   getBottleUrl,
+  getIconUrl,
   openSettings,
 }

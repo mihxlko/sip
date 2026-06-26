@@ -7,5 +7,6 @@ export interface SipPlatform {
   setPrefs(updates: Partial<SipPrefs>): Promise<void>
   onPrefsChanged(callback: (prefs: SipPrefs) => void): () => void
   getBottleUrl(type: BottleType, color: BottleColor): string
+  getIconUrl(size: 16 | 32 | 64 | 128, dark?: boolean): string
   openSettings(): void
 }
