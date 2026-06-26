@@ -8,6 +8,9 @@
     "packages/*",
     "apps/*"
   ],
+  "scripts": {
+    "sync-dark-tokens": "node scripts/sync-dark-tokens.js"
+  },
   "devDependencies": {
     "playwright": "^1.61.1"
   }

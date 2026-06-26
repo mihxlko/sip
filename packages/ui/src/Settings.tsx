@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Toaster, toast as sonnerToast } from 'sonner'
+import NumberFlow from '@number-flow/react'
 import {
   BottleColor, BottleType, DEFAULT_PREFS, type SipPlatform, type SipPrefs,
 } from '@sip/types'
@@ -30,27 +31,15 @@ function resolveIsDark(theme: SipPrefs['theme']): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
-function fmtInterval(m: number): string {
-  const h = Math.floor(m / 60)
-  const r = m % 60
-  const parts: string[] = []
-  if (h > 0) parts.push(`${h} Hour${h !== 1 ? 's' : ''}`)
-  if (r > 0) parts.push(`${r} Minute${r !== 1 ? 's' : ''}`)
-  return parts.join(' ') || '5 Minutes'
-}
-
 // ─── settings ────────────────────────────────────────────────────────────────
 
 interface Props { platform: SipPlatform; onClose: () => void }
 
 export default function Settings({ platform, onClose }: Props) {
   const [prefs, setPrefsState] = useState<SipPrefs>(DEFAULT_PREFS)
-  const [digits, setDigits] = useState('0015')
-  const [slotAnim, setSlotAnim] = useState<Record<number, { nonce: number; mode: 'enter' | 'leave' }>>({})
-  const [digitsFocused, setDigitsFocused] = useState(false)
+  const [clockInput, setClockInput] = useState('00:15')
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
   const clockTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const digitsInputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -60,7 +49,7 @@ export default function Settings({ platform, onClose }: Props) {
         setPrefsState(p)
         const h = String(Math.floor(p.intervalMinutes / 60)).padStart(2, '0')
         const m = String(p.intervalMinutes % 60).padStart(2, '0')
-        setDigits(`${h}${m}`)
+        setClockInput(`${h}:${m}`)
       }
     })
     return () => { live = false }
@@ -92,27 +81,11 @@ export default function Settings({ platform, onClose }: Props) {
     })
   }
 
-  // Truncates at the first digit that would make the time invalid, rather
-  // than clamping it — so typing a disallowed digit simply has no effect,
-  // same as a native input rejecting a keystroke.
-  function clampDigits(raw: string): string {
-    let out = ''
-    for (let i = 0; i < raw.length; i++) {
-      const d = raw[i]
-      if (i === 0 && d > '2') break
-      // hour can go up to 24 (tens digit '2' allows ones up to '4')
-      if (i === 1 && out[0] === '2' && d > '4') break
-      if (i === 2 && d > '5') break
-      out += d
-    }
-    return out
-  }
-
-  // Times are bounded to 00:01–24:00 — 24:00 is only valid with :00 minutes.
-  function parseDigits(s: string): number | null {
-    if (s.length !== 4) return null
-    const h = parseInt(s.slice(0, 2), 10)
-    const m = parseInt(s.slice(2, 4), 10)
+  function parseClockInput(s: string): number | null {
+    const match = s.match(/^(\d{1,2}):(\d{2})$/)
+    if (!match) return null
+    const h = parseInt(match[1], 10)
+    const m = parseInt(match[2], 10)
     if (h > 24 || m > 59) return null
     if (h === 24 && m !== 0) return null
     const total = h * 60 + m
@@ -120,77 +93,38 @@ export default function Settings({ platform, onClose }: Props) {
     return total
   }
 
-  function bumpSlotAnim(i: number, mode: 'enter' | 'leave') {
-    setSlotAnim(prev => ({ ...prev, [i]: { nonce: (prev[i]?.nonce ?? 0) + 1, mode } }))
-  }
-
-  function diffDigits(prev: string, next: string) {
-    for (let i = 0; i < 4; i++) {
-      if (prev[i] !== next[i]) bumpSlotAnim(i, next[i] !== undefined ? 'enter' : 'leave')
+  function handleClockChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value
+    const deleting = raw.length < clockInput.length
+    let val = raw.replace(/[^0-9:]/g, '')
+    const digits = val.replace(/:/g, '')
+    if (!deleting && digits.length >= 2 && !val.includes(':')) {
+      val = digits.slice(0, 2) + ':' + digits.slice(2)
     }
-  }
-
-  function handleDigitsChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = clampDigits(e.target.value.replace(/\D/g, '').slice(0, 4))
-    diffDigits(digits, raw)
-    setDigits(raw)
+    val = val.slice(0, 5)
+    setClockInput(val)
 
     clearTimeout(clockTimerRef.current)
     clockTimerRef.current = setTimeout(() => {
-      const mins = parseDigits(raw)
+      const mins = parseClockInput(val)
       if (mins !== null) update({ intervalMinutes: mins })
     }, 500)
   }
 
-  function handleDigitsBlur() {
+  function handleClockBlur() {
     clearTimeout(clockTimerRef.current)
-    setDigitsFocused(false)
-    const mins = parseDigits(digits)
+    const mins = parseClockInput(clockInput)
     if (mins !== null) {
       update({ intervalMinutes: mins })
     } else {
       const h = String(Math.floor(prefs.intervalMinutes / 60)).padStart(2, '0')
       const m = String(prefs.intervalMinutes % 60).padStart(2, '0')
-      setDigits(`${h}${m}`)
+      setClockInput(`${h}:${m}`)
     }
   }
 
-  function handleDigitsKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleClockKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') e.currentTarget.blur()
-  }
-
-  // The hidden input's text is invisible, so the native caret lands wherever
-  // its real (tiny) glyphs happen to be — not at the slot the user actually
-  // clicked. This is an append/backspace-only field, so every click should
-  // just put the caret at the end, regardless of which slot was clicked.
-  function handleDigitsClick(e: React.MouseEvent<HTMLInputElement>) {
-    const el = e.currentTarget
-    el.setSelectionRange(el.value.length, el.value.length)
-  }
-
-  function renderDigitSlot(i: number) {
-    const char = digits[i]
-    const filled = char !== undefined
-    const active = digitsFocused && i === Math.min(digits.length, 3)
-    const anim = slotAnim[i]
-    return (
-      <div
-        key={i}
-        className={`bg-surface-primary border-0.5 rounded-lg shadow-subtle flex items-center justify-center p-pad-md ${
-          active ? 'border-border-focus' : 'border-border-default'
-        }`}
-        style={{ minWidth: 44, minHeight: 52 }}
-      >
-        <span
-          key={anim?.nonce ?? 0}
-          className={`text-xl font-semibold leading-none ${filled ? 'text-text-primary' : 'text-text-tertiary'} ${
-            anim?.mode === 'enter' ? 'sip-digit-pop-in' : anim?.mode === 'leave' ? 'sip-digit-pop-out' : ''
-          }`}
-        >
-          {filled ? char : '0'}
-        </span>
-      </div>
-    )
   }
 
   function testToast() {
@@ -222,18 +156,6 @@ export default function Settings({ platform, onClose }: Props) {
 
   return (
     <>
-    <style>{`
-      @keyframes sip-digit-pop-in {
-        0%   { transform: scale(0.4) translateY(8px); opacity: 0.3; }
-        100% { transform: scale(1) translateY(0); opacity: 1; }
-      }
-      @keyframes sip-digit-pop-out {
-        0%   { transform: scale(0.4) translateY(8px); opacity: 0.3; }
-        100% { transform: scale(1) translateY(0); opacity: 1; }
-      }
-      .sip-digit-pop-in  { animation: sip-digit-pop-in 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-      .sip-digit-pop-out { animation: sip-digit-pop-out 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-    `}</style>
     <Toaster
       position="top-right"
       offset="16px"
@@ -267,7 +189,7 @@ export default function Settings({ platform, onClose }: Props) {
           {/* Test button: rounded-full = design's 25px radius — no exact token */}
           <button
             onClick={testToast}
-            className="cursor-pointer bg-surface-elevated border-0.5 border-border-default rounded-full shadow-subtle px-gap-md py-xs text-sm font-semibold text-text-secondary appearance-none outline-none hover:bg-state-hover hover:text-text-primary"
+            className="cursor-pointer bg-surface-elevated border-0.5 border-border-emphasis rounded-full shadow-subtle px-gap-md py-xs text-sm font-semibold text-text-secondary appearance-none outline-none hover:bg-state-hover hover:text-text-primary"
           >
             Test
           </button>
@@ -278,12 +200,12 @@ export default function Settings({ platform, onClose }: Props) {
 
           {/* bottle card — flex-1: takes leftover space after the content-sized right column */}
           <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
-            <span className="text-text-secondary text-md font-medium px-[2px]">Bottle</span>
+            <span className="text-text-secondary text-md font-medium px-[8px]">Bottle</span>
 
             {/* large preview — 250×250 with 50px inner padding */}
             <div
               className="bg-surface-base border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center overflow-clip p-space-padding-xl"
-              style={{ width: 250, height: 250 }}
+              style={{ width: 250, height: 230 }}
             >
               <img
                 src={platform.getBottleUrl(prefs.bottleType, prefs.bottleColor)}
@@ -302,7 +224,7 @@ export default function Settings({ platform, onClose }: Props) {
                     onClick={() => update({ bottleType: type })}
                     className={`cursor-pointer relative overflow-clip rounded-md border-0.5 shadow-subtle flex items-center justify-center appearance-none p-0 outline-none ${
                       prefs.bottleType === type
-                        ? 'bg-surface-base border-border-strong'
+                        ? 'bg-state-selected border-border-emphasis'
                         : 'bg-surface-base border-border-default'
                     }`}
                     style={{ width: 75, height: 75 }}
@@ -313,7 +235,7 @@ export default function Settings({ platform, onClose }: Props) {
               </div>
             </div>
 
-            {/* color swatches — 38×38 */}
+            {/* color swatches — 34×34 */}
             <div className="flex flex-col gap-gap-md p-pad-md">
               <span className="text-text-muted text-md font-medium px-[2px]">Color</span>
               <div className="flex justify-between">
@@ -322,12 +244,13 @@ export default function Settings({ platform, onClose }: Props) {
                     key={color}
                     onClick={() => update({ bottleColor: color })}
                     aria-label={color}
-                    className="cursor-pointer overflow-clip rounded-md shadow-subtle appearance-none p-0 outline-none"
+                    className="cursor-pointer overflow-clip shadow-subtle appearance-none p-0 outline-none"
                     style={{
-                      width: 38, height: 38,
+                      width: 34, height: 34,
+                      borderRadius: 'var(--radius-sm)',
                       backgroundColor: BOTTLE_COLORS[color],
-                      outline: prefs.bottleColor === color ? '2px solid var(--border-strong)' : undefined,
-                      outlineOffset: prefs.bottleColor === color ? 2 : undefined,
+                      outline: prefs.bottleColor === color ? '2px solid var(--border-focus)' : undefined,
+                      outlineOffset: prefs.bottleColor === color ? 0.5 : undefined,
                     }}
                   />
                 ))}
@@ -356,7 +279,7 @@ export default function Settings({ platform, onClose }: Props) {
                 value={prefs.titleText}
                 maxLength={40}
                 onChange={e => update({ titleText: e.target.value })}
-                className="bg-surface-primary border-0.5 border-border-default rounded-md shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none focus:border-1.5 focus:border-border-focus"
+                className="bg-surface-primary border-0.5 border-border-emphasis focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none"
               />
             </div>
 
@@ -370,7 +293,7 @@ export default function Settings({ platform, onClose }: Props) {
                 value={prefs.messageText}
                 maxLength={60}
                 onChange={e => update({ messageText: e.target.value })}
-                className="bg-surface-primary border-0.5 border-border-default rounded-md shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none focus:border-1.5 focus:border-border-focus"
+                className="bg-surface-primary border-0.5 border-border-emphasis focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none"
                 style={{ height: 72 }}
               />
             </div>
@@ -383,37 +306,42 @@ export default function Settings({ platform, onClose }: Props) {
           <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Time</span>
 
-            {/* fixed-size slot divs (not text-driven width) so neither the
-                displayed digit nor the focus ring can change the row's
-                footprint; the hidden input sits on top so a tap/click
-                anywhere on the row focuses it natively. */}
-            <div className="relative flex items-center justify-center gap-xs" style={{ cursor: 'text' }}>
-              {renderDigitSlot(0)}
-              {renderDigitSlot(1)}
-              <span className="text-text-muted text-xl font-semibold px-[2px]">:</span>
-              {renderDigitSlot(2)}
-              {renderDigitSlot(3)}
-              <input
-                ref={digitsInputRef}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={digits}
-                onChange={handleDigitsChange}
-                onFocus={() => setDigitsFocused(true)}
-                onBlur={handleDigitsBlur}
-                onKeyDown={handleDigitsKeyDown}
-                onClick={handleDigitsClick}
-                maxLength={4}
-                aria-label="Time"
-                className="absolute inset-0 w-full h-full opacity-0 border-0 outline-none appearance-none bg-transparent cursor-text"
-              />
-            </div>
+            <input
+              type="text"
+              value={clockInput}
+              onChange={handleClockChange}
+              onBlur={handleClockBlur}
+              onKeyDown={handleClockKeyDown}
+              placeholder="HH:MM"
+              maxLength={5}
+              className="border-0.5 border-border-emphasis focus:border-border-focus rounded-xl shadow-subtle px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-transparent font-sans appearance-none"
+            />
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
-              <span className="text-text-muted text-md font-medium shrink-0">Every:</span>
-              <div className="flex-1 self-stretch rounded-xs shadow-subtle flex items-center">
-                <span className="text-md font-medium text-text-primary">{fmtInterval(prefs.intervalMinutes)}</span>
+              <span className="text-text-muted text-lg font-medium shrink-0">Every:</span>
+              <div className="flex-1 self-stretch rounded-xs shadow-subtle flex items-center gap-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {Math.floor(prefs.intervalMinutes / 60) > 0 && (
+                  <span className="text-lg font-medium text-text-primary inline-flex items-center">
+                    <NumberFlow
+                      value={Math.floor(prefs.intervalMinutes / 60)}
+                      transformTiming={{ duration: 500, easing: 'cubic-bezier(0.21, 1.02, 0.73, 1)' }}
+                      spinTiming={{ duration: 500, easing: 'cubic-bezier(0.21, 1.02, 0.73, 1)' }}
+                      opacityTiming={{ duration: 300, easing: 'ease-out' }}
+                    />
+                    <span className="ml-1">{Math.floor(prefs.intervalMinutes / 60) === 1 ? 'Hour' : 'Hours'}</span>
+                  </span>
+                )}
+                {prefs.intervalMinutes % 60 > 0 && (
+                  <span className="text-lg font-medium text-text-primary inline-flex items-center">
+                    <NumberFlow
+                      value={prefs.intervalMinutes % 60}
+                      transformTiming={{ duration: 500, easing: 'cubic-bezier(0.21, 1.02, 0.73, 1)' }}
+                      spinTiming={{ duration: 500, easing: 'cubic-bezier(0.21, 1.02, 0.73, 1)' }}
+                      opacityTiming={{ duration: 300, easing: 'ease-out' }}
+                    />
+                    <span className="ml-1">{prefs.intervalMinutes % 60 === 1 ? 'Minute' : 'Minutes'}</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -425,7 +353,7 @@ export default function Settings({ platform, onClose }: Props) {
             {/* 100×100 preview — no token */}
             <div className="flex flex-col items-center gap-xs">
               <div
-                className="border-0.5 border-border-default rounded-lg shadow-subtle flex items-center justify-center bg-surface-base"
+                className="border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center bg-surface-base"
                 style={{ width: 100, height: 100 }}
               >
                 {prefs.customIcon
@@ -435,7 +363,7 @@ export default function Settings({ platform, onClose }: Props) {
               </div>
               <button
                 onClick={pickIcon}
-                className="cursor-pointer bg-transparent border-0 outline-none appearance-none rounded-xl px-pad-md py-xs text-sm font-medium text-text-secondary hover:bg-state-hover hover:text-text-primary"
+                className="cursor-pointer bg-transparent border-0 outline-none appearance-none p-0 text-sm font-medium text-text-tertiary hover:text-text-primary"
               >
                 Upload Custom
               </button>
@@ -460,7 +388,7 @@ export default function Settings({ platform, onClose }: Props) {
                   </span>
                 )}
               </div>
-              <span className="text-sm font-medium text-text-primary">Show Logo</span>
+              <span className="text-sm font-medium text-text-secondary hover:text-text-primary">Show Logo</span>
             </div>
           </div>
 
@@ -469,7 +397,7 @@ export default function Settings({ platform, onClose }: Props) {
             <span className="text-text-secondary text-md font-medium pl-[4px]">Appearance</span>
 
             {/* icon container 25×25: no token */}
-            <div className="border-0.5 border-border-default rounded-lg shadow-subtle flex flex-col gap-xs p-xs">
+            <div className="border-0.5 border-border-emphasis rounded-lg shadow-subtle flex flex-col gap-xs p-xs">
               {(['system', 'light', 'dark'] as const).map(theme => (
                 <button
                   key={theme}
@@ -483,8 +411,8 @@ export default function Settings({ platform, onClose }: Props) {
                   <div
                     className={`border-0.5 rounded-sm shadow-subtle flex items-center justify-center shrink-0 ${
                       prefs.theme === theme
-                        ? 'bg-state-selected border-border-strong'
-                        : 'bg-surface-elevated border-border-default group-hover:bg-state-hover'
+                        ? 'bg-state-selected border-border-emphasis'
+                        : 'bg-surface-elevated border-border-strong group-hover:bg-state-hover'
                     }`}
                     style={{ width: 25, height: 25 }}
                   >
@@ -512,7 +440,7 @@ function ToastPreview({ platform, prefs, dark }: { platform: SipPlatform; prefs:
   const src = platform.getBottleUrl(prefs.bottleType, prefs.bottleColor)
 
   return (
-    <div className="w-[450px] bg-surface-elevated border-0.5 border-border-default rounded-xl shadow p-pad-xl flex flex-col overflow-clip">
+    <div className="w-[450px] bg-surface-elevated border-0.5 border-border-emphasis rounded-xl shadow p-pad-xl flex flex-col overflow-clip">
 
       {/* ── inner row: toast-left + close × ── */}
       <div className="flex gap-gap-xl items-start justify-between">

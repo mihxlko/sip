@@ -28,10 +28,11 @@ export default {
         'text-error':     'var(--text-error)',
         'text-brand':     'var(--text-brand)',
 
-        // borders  (class: border-border-default, border-border-strong)
-        'border-default': 'var(--border-default)',
-        'border-strong':  'var(--border-strong)',
-        'border-focus':   'var(--border-focus)',
+        // borders  (class: border-border-default, border-border-strong, etc.)
+        'border-default':  'var(--border-default)',
+        'border-strong':   'var(--border-strong)',
+        'border-emphasis': 'var(--border-emphasis)',
+        'border-focus':    'var(--border-focus)',
 
         // interaction overlays  (class: bg-state-hover, etc.)
         'state-hover':    'var(--state-hover)',
