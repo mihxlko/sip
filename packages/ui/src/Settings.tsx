@@ -189,7 +189,7 @@ export default function Settings({ platform, onClose }: Props) {
           {/* Test button: rounded-full = design's 25px radius — no exact token */}
           <button
             onClick={testToast}
-            className="cursor-pointer bg-surface-elevated border-0.5 border-border-emphasis rounded-full shadow-subtle px-gap-md py-xs text-sm font-semibold text-text-secondary appearance-none outline-none hover:bg-state-hover hover:text-text-primary"
+            className="btn-press cursor-pointer bg-surface-elevated border-0.5 border-border-emphasis rounded-full shadow-subtle px-gap-md py-xs text-sm font-semibold text-text-secondary appearance-none outline-none hover:bg-[image:linear-gradient(var(--state-hover),var(--state-hover))] hover:text-text-primary"
           >
             Test
           </button>
@@ -402,17 +402,17 @@ export default function Settings({ platform, onClose }: Props) {
                 <button
                   key={theme}
                   onClick={() => update({ theme })}
-                  className={`group cursor-pointer flex items-center gap-pad-md rounded-sm px-xs py-xs border-0 outline-none appearance-none w-full ${
+                  className={`cursor-pointer flex items-center gap-pad-md rounded-sm px-xs py-xs border-0 outline-none appearance-none w-full ${
                     prefs.theme === theme
                       ? 'bg-state-selected text-text-secondary'
-                      : 'bg-transparent text-text-tertiary hover:bg-state-hover hover:text-text-secondary'
+                      : 'bg-surface-primary text-text-tertiary hover:bg-state-hover hover:text-text-secondary'
                   }`}
                 >
                   <div
                     className={`border-0.5 rounded-sm shadow-subtle flex items-center justify-center shrink-0 ${
                       prefs.theme === theme
                         ? 'bg-state-selected border-border-emphasis'
-                        : 'bg-surface-elevated border-border-strong group-hover:bg-state-hover'
+                        : 'bg-surface-elevated border-border-strong'
                     }`}
                     style={{ width: 25, height: 25 }}
                   >

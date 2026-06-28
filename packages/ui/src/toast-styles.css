@@ -70,7 +70,7 @@
   --text-brand:     var(--brand-primary-500);
 
   /* ── semantic: interaction overlays (light defaults) ───────────────── */
-  --state-hover:    rgba(0, 0, 0, 0.03);
+  --state-hover:    rgba(0, 0, 0, 0.04);
   --state-active:   rgba(0, 0, 0, 0.07);
   --state-selected: rgba(0, 0, 0, 0.05);
 
@@ -188,7 +188,7 @@
     --text-tertiary:  var(--neutral-400);
     --text-muted:     var(--neutral-500);
 
-    --state-hover:    rgba(255, 255, 255, 0.0);
+    --state-hover:    rgba(255, 255, 255, 0.03);
     --state-active:   rgba(255, 255, 255, 0.10);
     --state-selected: rgba(255, 255, 255, 0.08);
 
@@ -264,7 +264,7 @@
   width: 450px;
   background-color: var(--surface-elevated);
   border-width: var(--border-width-default);
-  border-color: var(--border-default);
+  border-color: var(--border-emphasis);
   border-radius: var(--radius-xl);
   box-shadow: var(--box-shadow-default);
   padding: var(--space-padding-xl);

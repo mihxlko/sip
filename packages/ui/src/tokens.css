@@ -70,7 +70,7 @@
   --text-brand:     var(--brand-primary-500);
 
   /* ── semantic: interaction overlays (light defaults) ───────────────── */
-  --state-hover:    rgba(0, 0, 0, 0.03);
+  --state-hover:    rgba(0, 0, 0, 0.04);
   --state-active:   rgba(0, 0, 0, 0.07);
   --state-selected: rgba(0, 0, 0, 0.05);
 
@@ -155,7 +155,7 @@
   --text-tertiary:  var(--neutral-400);
   --text-muted:     var(--neutral-300);
 
-  --state-hover:    rgba(0, 0, 0, 0.03);
+  --state-hover:    rgba(0, 0, 0, 0.04);
   --state-active:   rgba(0, 0, 0, 0.07);
   --state-selected: rgba(0, 0, 0, 0.05);
 
@@ -222,3 +222,25 @@
     --color-button: var(--surface-primary);
   }
 }
+
+/* ── press animation utility ─────────────────────────────────────────────────
+   Two-phase spring press: 100ms ease-out compress, 350ms spring-bezier release.
+   cubic-bezier(0.34, 1.56, 0.64, 1) overshoots scale(1) slightly — the source
+   of the "alive" feeling. */
+.btn-press {
+  transition: transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+.btn-press:active {
+  transform: scale(0.96);
+  transition-duration: 100ms;
+  transition-timing-function: ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-press,
+  .btn-press:active {
+    transition: none;
+    transform: none;
+  }
+}
+
