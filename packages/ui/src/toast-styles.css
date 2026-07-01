@@ -58,6 +58,7 @@
 
   /* ── semantic: surfaces (light defaults) ───────────────────────────── */
   --surface-elevated: var(--white);
+  --surface-raised:   var(--white);
   --surface-primary:  var(--white);
   --surface-base:     var(--neutral-03);
 
@@ -153,6 +154,7 @@
 [data-theme="dark"],
 :host([data-theme="dark"]) {
   --surface-elevated: var(--neutral-800);
+  --surface-raised:   var(--neutral-850);
   --surface-primary:  var(--neutral-900);
   --surface-base:     var(--neutral-950);
 
@@ -180,6 +182,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --surface-elevated: var(--neutral-800);
+    --surface-raised:   var(--neutral-850);
     --surface-primary:  var(--neutral-900);
     --surface-base:     var(--neutral-950);
 
@@ -341,7 +344,6 @@
    Maps: shrink-0 mb-0.5                                                      */
 .sip-toast-badge {
   flex-shrink: 0;
-  margin-bottom: 2px;
 }
 
 /* custom icon img inside badge

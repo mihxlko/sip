@@ -279,7 +279,7 @@ export default function Settings({ platform, onClose }: Props) {
                 value={prefs.titleText}
                 maxLength={40}
                 onChange={e => update({ titleText: e.target.value })}
-                className="bg-surface-primary border-0.5 border-border-emphasis focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none"
+                className="bg-surface-raised border-0.5 border-border-emphasis focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none"
               />
             </div>
 
@@ -293,7 +293,7 @@ export default function Settings({ platform, onClose }: Props) {
                 value={prefs.messageText}
                 maxLength={60}
                 onChange={e => update({ messageText: e.target.value })}
-                className="bg-surface-primary border-0.5 border-border-emphasis focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none"
+                className="bg-surface-raised border-0.5 border-border-emphasis focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none"
                 style={{ height: 72 }}
               />
             </div>
@@ -314,7 +314,7 @@ export default function Settings({ platform, onClose }: Props) {
               onKeyDown={handleClockKeyDown}
               placeholder="HH:MM"
               maxLength={5}
-              className="border-0.5 border-border-emphasis focus:border-border-focus rounded-xl px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-transparent font-sans appearance-none"
+              className="border-0.5 border-border-emphasis focus:border-border-focus rounded-xl px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-surface-raised font-sans appearance-none"
             />
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
@@ -396,23 +396,23 @@ export default function Settings({ platform, onClose }: Props) {
           <div className="w-[130px] shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Appearance</span>
 
-            {/* icon container 25×25: no token */}
-            <div className="border-0.5 border-border-emphasis rounded-lg shadow-subtle flex flex-col gap-xs p-xs">
+            {/* button group — no chrome; container is just the buttons */}
+            <div className="flex flex-col gap-0.5">
               {(['system', 'light', 'dark'] as const).map(theme => (
                 <button
                   key={theme}
                   onClick={() => update({ theme })}
-                  className={`cursor-pointer flex items-center gap-pad-md rounded-sm px-xs py-xs border-0 outline-none appearance-none w-full ${
+                  className={`cursor-pointer flex items-center gap-pad-md rounded-md px-xs py-xs border-0 outline-none appearance-none w-full ${
                     prefs.theme === theme
                       ? 'bg-state-selected text-text-secondary'
                       : 'bg-surface-primary text-text-tertiary hover:bg-state-hover hover:text-text-secondary'
                   }`}
                 >
                   <div
-                    className={`border-0.5 rounded-sm shadow-subtle flex items-center justify-center shrink-0 ${
+                    className={`border rounded-sm shadow-subtle flex items-center justify-center shrink-0 ${
                       prefs.theme === theme
-                        ? 'bg-state-selected border-border-emphasis'
-                        : 'bg-surface-elevated border-border-strong'
+                        ? 'border-border-emphasis'
+                        : 'border-border-strong'
                     }`}
                     style={{ width: 25, height: 25 }}
                   >
@@ -470,10 +470,10 @@ function ToastPreview({ platform, prefs, dark }: { platform: SipPlatform; prefs:
                   {prefs.titleText || 'Title'}
                 </span>
                 {prefs.showLogo && (
-                  <div className="shrink-0 mb-0.5">
+                  <div className="shrink-0">
                     {prefs.customIcon
                       ? <img src={prefs.customIcon} width={28} height={18} className="block rounded-md object-cover" />
-                      : <img src={platform.getIconUrl(32, dark)} width={20} height={20} alt="SIP" style={{ display: 'block', borderRadius: 4 }} />
+                      : <img src={platform.getIconUrl(32, dark)} width={16} height={16} alt="SIP" style={{ display: 'block', borderRadius: 4 }} />
                     }
                   </div>
                 )}

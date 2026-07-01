@@ -72,7 +72,7 @@ export default function SipToast({ platform, prefs, onDismiss, mode = 'live' }: 
                   <div className="sip-toast-badge">
                     {prefs.customIcon
                       ? <img src={prefs.customIcon} width={28} height={18} className="sip-toast-badge-img" />
-                      : <img src={platform.getIconUrl(32, dark)} width={20} height={20} alt="SIP" style={{ display: 'block', borderRadius: 4 }} />
+                      : <img src={platform.getIconUrl(32, dark)} width={16} height={16} alt="SIP" style={{ display: 'block', borderRadius: 4 }} />
                     }
                   </div>
                 )}

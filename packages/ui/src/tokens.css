@@ -58,6 +58,7 @@
 
   /* ── semantic: surfaces (light defaults) ───────────────────────────── */
   --surface-elevated: var(--white);
+  --surface-raised:   var(--white);
   --surface-primary:  var(--white);
   --surface-base:     var(--neutral-03);
 
@@ -147,6 +148,7 @@
 /* ── explicit light theme ─────────────────────────────────────────────────── */
 [data-theme="light"] {
   --surface-elevated: var(--white);
+  --surface-raised:   var(--white);
   --surface-primary:  var(--white);
   --surface-base:     var(--neutral-03);
 
@@ -170,6 +172,7 @@
 /* ── explicit dark theme ──────────────────────────────────────────────────── */
 [data-theme="dark"] {
   --surface-elevated: var(--neutral-800);
+  --surface-raised:   var(--neutral-850);
   --surface-primary:  var(--neutral-900);
   --surface-base:     var(--neutral-950);
 
@@ -198,6 +201,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --surface-elevated: var(--neutral-800);
+    --surface-raised:   var(--neutral-850);
     --surface-primary:  var(--neutral-900);
     --surface-base:     var(--neutral-950);
 

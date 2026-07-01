@@ -17,6 +17,7 @@ export default {
       colors: {
         // surfaces
         'surface-elevated': 'var(--surface-elevated)',
+        'surface-raised':   'var(--surface-raised)',
         'surface-primary':  'var(--surface-primary)',
         'surface-base':     'var(--surface-base)',
 
