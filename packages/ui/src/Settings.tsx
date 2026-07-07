@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Toaster, toast as sonnerToast } from 'sonner'
-import NumberFlow from '@number-flow/react'
 import {
   BottleColor, BottleType, DEFAULT_PREFS, type SipPlatform, type SipPrefs,
 } from '@sip/types'
@@ -40,6 +39,8 @@ export default function Settings({ platform, onClose }: Props) {
   const [clockInput, setClockInput] = useState('00:15')
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
   const clockTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const clockRef = useRef<HTMLInputElement>(null)
+  const clockCaretRef = useRef<number | null>(null)
   const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -70,6 +71,17 @@ export default function Settings({ platform, onClose }: Props) {
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Restore the clock caret after a masked edit re-renders the controlled input
+  // (React otherwise parks it at the end). Layout effect = synchronous, so it
+  // lands before the next keystroke is processed.
+  useLayoutEffect(() => {
+    if (clockCaretRef.current !== null && clockRef.current) {
+      const p = clockCaretRef.current
+      clockRef.current.setSelectionRange(p, p)
+      clockCaretRef.current = null
+    }
+  }, [clockInput])
+
   function update(patch: Partial<SipPrefs>) {
     setPrefsState(prev => {
       const next = { ...prev, ...patch }
@@ -93,22 +105,49 @@ export default function Settings({ platform, onClose }: Props) {
     return total
   }
 
-  function handleClockChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value
-    const deleting = raw.length < clockInput.length
-    let val = raw.replace(/[^0-9:]/g, '')
-    const digits = val.replace(/:/g, '')
-    if (!deleting && digits.length >= 2 && !val.includes(':')) {
-      val = digits.slice(0, 2) + ':' + digits.slice(2)
+  // The clock is a fixed 5-char "HH:MM" mask: the colon lives permanently at
+  // index 2 and can never be deleted, and every digit slot always holds a
+  // character. Because the length never changes, the field can't reflow (no
+  // horizontal/vertical shift), and the caret hops over the colon on edit.
+  function commitClock(next: string, caret: number) {
+    if (next === clockInput) {
+      // No value change → no re-render (and no layout effect); the field still
+      // holds `next`, so move the caret now.
+      clockRef.current?.setSelectionRange(caret, caret)
+    } else {
+      // Stash the caret; the layout effect restores it synchronously right after
+      // React commits the new value, before the next key event is dispatched.
+      clockCaretRef.current = caret
+      setClockInput(next)
     }
-    val = val.slice(0, 5)
-    setClockInput(val)
 
     clearTimeout(clockTimerRef.current)
     clockTimerRef.current = setTimeout(() => {
-      const mins = parseClockInput(val)
+      const mins = parseClockInput(next)
       if (mins !== null) update({ intervalMinutes: mins })
     }, 500)
+  }
+
+  // Fallback for non-keyboard input (autofill / IME). Keyboard edits are
+  // handled in handleClockKeyDown, which preventDefaults and never fires this.
+  function handleClockChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 4).padEnd(4, '0')
+    commitClock(`${digits.slice(0, 2)}:${digits.slice(2)}`, 5)
+  }
+
+  function handleClockPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault()
+    const digits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4)
+    if (!digits) return
+    const chars = clockInput.split('')
+    let pos = (e.currentTarget.selectionStart ?? 0) === 2 ? 3 : (e.currentTarget.selectionStart ?? 0)
+    for (const d of digits) {
+      if (pos === 2) pos = 3       // never write onto the colon
+      if (pos > 4) break
+      chars[pos] = d
+      pos += 1
+    }
+    commitClock(chars.join(''), pos === 2 ? 3 : pos)
   }
 
   function handleClockBlur() {
@@ -124,7 +163,56 @@ export default function Settings({ platform, onClose }: Props) {
   }
 
   function handleClockKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') e.currentTarget.blur()
+    if (e.key === 'Enter') { e.currentTarget.blur(); return }
+    // Let shortcuts and navigation (⌘A, ⌘V, arrows, Tab…) through untouched.
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+
+    const el = e.currentTarget
+    const value = clockInput               // always "HH:MM"
+    const start = el.selectionStart ?? 0
+    const end = el.selectionEnd ?? start
+    const chars = value.split('')
+
+    // Typing over a selection clears the selected digit slots first.
+    const clearSelection = () => {
+      for (let i = start; i < end; i++) if (i !== 2) chars[i] = '0'
+    }
+
+    // Digit entry — overwrite semantics; the caret hops over the fixed colon.
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault()
+      if (start !== end) clearSelection()
+      const pos = start === 2 ? 3 : start  // never land on the colon
+      if (pos > 4) return                  // field is full
+      chars[pos] = e.key
+      let caret = pos + 1
+      if (caret === 2) caret = 3           // skip the colon after the 2nd digit
+      commitClock(chars.join(''), caret)
+      return
+    }
+
+    // Backspace — clear the digit to the LEFT, skipping over the colon.
+    if (e.key === 'Backspace') {
+      e.preventDefault()
+      if (start !== end) { clearSelection(); commitClock(chars.join(''), start); return }
+      let target = start - 1
+      if (target === 2) target = 1         // colon sits to the left → skip it
+      if (target < 0) return
+      chars[target] = '0'
+      commitClock(chars.join(''), target)
+      return
+    }
+
+    // Delete — clear the digit to the RIGHT, skipping over the colon.
+    if (e.key === 'Delete') {
+      e.preventDefault()
+      if (start !== end) { clearSelection(); commitClock(chars.join(''), start === 2 ? 3 : start); return }
+      const target = start === 2 ? 3 : start  // colon to the right → skip it
+      if (target > 4) return
+      chars[target] = '0'
+      commitClock(chars.join(''), target)     // Delete leaves the caret in place
+      return
+    }
   }
 
   function testToast() {
@@ -306,39 +394,45 @@ export default function Settings({ platform, onClose }: Props) {
           <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Time</span>
 
-            <input
-              type="text"
-              value={clockInput}
-              onChange={handleClockChange}
-              onBlur={handleClockBlur}
-              onKeyDown={handleClockKeyDown}
-              placeholder="HH:MM"
-              maxLength={5}
-              className="border-0.5 border-border-emphasis hover:border-border-focus focus:border-border-focus rounded-xl px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none focus:outline focus:outline-[0.5px] focus:outline-border-focus focus:outline-offset-0 bg-surface-raised font-sans appearance-none"
-            />
+            <div className="relative">
+              <input
+                ref={clockRef}
+                type="text"
+                inputMode="numeric"
+                value={clockInput}
+                onChange={handleClockChange}
+                onBlur={handleClockBlur}
+                onKeyDown={handleClockKeyDown}
+                onPaste={handleClockPaste}
+                placeholder="HH:MM"
+                maxLength={5}
+                className="border-0.5 border-border-emphasis hover:border-border-focus focus:border-border-focus rounded-xl px-pad-md py-pad-md text-xl font-semibold text-transparent caret-text-primary leading-tight text-center w-full outline-none focus:outline focus:outline-[0.5px] focus:outline-border-focus focus:outline-offset-0 bg-surface-raised font-sans appearance-none"
+              />
+              {/* Colored mirror: the native input owns the real value + caret (its
+                  own text is transparent); this overlay repaints the digits so the
+                  colon can be dimmed to text-tertiary. */}
+              <div
+                aria-hidden
+                className="pointer-events-none select-none absolute inset-0 flex items-center justify-center text-xl font-semibold leading-tight text-text-primary font-sans"
+              >
+                {clockInput.slice(0, 2)}
+                <span className="text-text-tertiary">{clockInput[2]}</span>
+                {clockInput.slice(3)}
+              </div>
+            </div>
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
               <span className="text-text-muted text-lg font-medium shrink-0">Every:</span>
               <div className="flex-1 self-stretch rounded-xs shadow-subtle flex items-center gap-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {Math.floor(prefs.intervalMinutes / 60) > 0 && (
                   <span className="text-lg font-medium text-text-primary inline-flex items-center">
-                    <NumberFlow
-                      value={Math.floor(prefs.intervalMinutes / 60)}
-                      transformTiming={{ duration: 500, easing: 'cubic-bezier(0.21, 1.02, 0.73, 1)' }}
-                      spinTiming={{ duration: 500, easing: 'cubic-bezier(0.21, 1.02, 0.73, 1)' }}
-                      opacityTiming={{ duration: 300, easing: 'ease-out' }}
-                    />
+                    <span>{Math.floor(prefs.intervalMinutes / 60)}</span>
                     <span className="ml-1">{Math.floor(prefs.intervalMinutes / 60) === 1 ? 'Hour' : 'Hours'}</span>
                   </span>
                 )}
                 {prefs.intervalMinutes % 60 > 0 && (
                   <span className="text-lg font-medium text-text-primary inline-flex items-center">
-                    <NumberFlow
-                      value={prefs.intervalMinutes % 60}
-                      transformTiming={{ duration: 500, easing: 'cubic-bezier(0.21, 1.02, 0.73, 1)' }}
-                      spinTiming={{ duration: 500, easing: 'cubic-bezier(0.21, 1.02, 0.73, 1)' }}
-                      opacityTiming={{ duration: 300, easing: 'ease-out' }}
-                    />
+                    <span>{prefs.intervalMinutes % 60}</span>
                     <span className="ml-1">{prefs.intervalMinutes % 60 === 1 ? 'Minute' : 'Minutes'}</span>
                   </span>
                 )}
@@ -402,19 +496,15 @@ export default function Settings({ platform, onClose }: Props) {
                 <button
                   key={theme}
                   onClick={() => update({ theme })}
-                  className={`cursor-pointer flex items-center gap-pad-md rounded-md px-xs py-xs border-0 outline-none appearance-none w-full ${
+                  className={`cursor-pointer flex items-center gap-1 rounded-md px-0.5 py-1 border-0 outline-none appearance-none w-full ${
                     prefs.theme === theme
                       ? 'bg-state-selected text-text-secondary'
                       : 'bg-surface-primary text-text-tertiary hover:bg-state-hover hover:text-text-secondary'
                   }`}
                 >
                   <div
-                    className={`border rounded-sm shadow-subtle flex items-center justify-center shrink-0 ${
-                      prefs.theme === theme
-                        ? 'border-border-emphasis'
-                        : 'border-border-strong'
-                    }`}
-                    style={{ width: 25, height: 25 }}
+                    className="rounded-sm shadow-subtle flex items-center justify-center shrink-0"
+                    style={{ width: 24, height: 24 }}
                   >
                     <ThemeIcon theme={theme} />
                   </div>
@@ -536,7 +626,7 @@ function ThemeIcon({ theme }: { theme: 'system' | 'light' | 'dark' }) {
     )
   }
   return (
-    <svg width="15" height="15" viewBox="0 0 21 22" fill="none">
+    <svg width="15" height="15" viewBox="-1.5 -1.3 24 24" fill="none">
       <path d="M0.777 11.175C1.137 16.325 5.507 20.515 10.737 20.745C14.427 20.905 17.727 19.185 19.707 16.475C20.527 15.365 20.087 14.625 18.717 14.875C18.047 14.995 17.357 15.045 16.637 15.015C11.747 14.815 7.747 10.725 7.727 5.895C7.717 4.595 7.987 3.365 8.477 2.245C9.017 1.005 8.367 0.415 7.117 0.945C3.157 2.615 0.447 6.605 0.777 11.175Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )

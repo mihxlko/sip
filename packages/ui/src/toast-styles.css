@@ -240,6 +240,20 @@
 .toast     { animation: sip-in  var(--sip-enter-duration) var(--sip-ease-in)  both; pointer-events: auto; }
 .toast.out { animation: sip-out var(--sip-exit-duration)  var(--sip-ease-out) both; }
 
+/* ── reduced motion ──────────────────────────────────────────────────────────
+   Honour the OS setting across every toast surface. The Sonner-driven preview
+   toast is already covered by Sonner's own prefers-reduced-motion query; this
+   handles the live toast's enter/exit and the bottle shimmer, which loops on
+   all three surfaces (live, preview, static).                                  */
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast.out,
+  .sip-bottle-shimmer,
+  .sip-bottle-shimmer-overlay {
+    animation: none;
+  }
+}
+
 .sip-bottle-shimmer {
   animation: sip-shimmer-hue var(--shimmer-hue-duration) var(--shimmer-ease) infinite;
 }

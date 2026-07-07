@@ -11,7 +11,6 @@
     "./toast-styles.css": "./src/toast-styles.css"
   },
   "dependencies": {
-    "@number-flow/react": "^0.6.0",
     "@sip/types": "*",
     "sonner": "^2.0.7"
   },
