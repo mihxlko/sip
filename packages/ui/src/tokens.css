@@ -247,6 +247,7 @@
       color            300ms ease-out,
       background-color 300ms ease-out,
       border-color     300ms ease-out,
+      outline-color    300ms ease-out,
       box-shadow       300ms ease-out,
       opacity          300ms ease-out !important;
   }

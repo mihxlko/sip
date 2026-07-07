@@ -547,10 +547,16 @@ export default function Settings({ platform, onClose }: Props) {
                 <button
                   key={theme}
                   onClick={() => changeTheme(theme)}
+                  /* Unselected = bg-transparent (not bg-surface-primary): visually identical
+                     over the surface-primary card at rest, but it keeps the alpha profile
+                     aligned with the selected state (state-selected ~0.08). Otherwise the
+                     just-picked button gets its bg animated from opaque surface-primary →
+                     transparent state-selected on a theme switch, so its opaque color "holds"
+                     and lags the crossfade instead of fading in with it. */
                   className={`cursor-pointer flex items-center gap-1 rounded-md px-0.5 py-1 border-0 outline-none appearance-none w-full ${
                     prefs.theme === theme
                       ? 'bg-state-selected text-text-secondary'
-                      : 'bg-surface-primary text-text-tertiary hover:bg-state-hover hover:text-text-secondary'
+                      : 'bg-transparent text-text-tertiary hover:bg-state-hover hover:text-text-secondary'
                   }`}
                 >
                   <div
