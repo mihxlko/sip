@@ -227,6 +227,31 @@
   }
 }
 
+/* ── theme transition ─────────────────────────────────────────────────────────
+   Gradual-but-snappy light/dark interpolation, ported from portfolio-1 but
+   adapted to SIP. There, two properties (color + background-color) gave provably
+   total coverage because the page has no borders/shadows/images. SIP re-themes
+   more: border-color and box-shadow both change in the token blocks above, so a
+   two-property rule would leave every border and card shadow snapping while
+   backgrounds slid. We therefore widen the gated rule to SIP's full themed paint
+   surface, plus opacity to drive the stacked-logo crossfade.
+
+   Armed by JS: `data-theme-transitioning` is set on the settings root only for
+   user-initiated switches (never on load), in the same update as the data-theme
+   flip, then removed on a ~350ms timer so the rule can never taint hover states
+   or first paint. prefers-reduced-motion users get an instant swap. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme-transitioning],
+  [data-theme-transitioning] * {
+    transition:
+      color            300ms ease-out,
+      background-color 300ms ease-out,
+      border-color     300ms ease-out,
+      box-shadow       300ms ease-out,
+      opacity          300ms ease-out !important;
+  }
+}
+
 /* ── press animation utility ─────────────────────────────────────────────────
    Two-phase spring press: 100ms ease-out compress, 350ms spring-bezier release.
    cubic-bezier(0.34, 1.56, 0.64, 1) overshoots scale(1) slightly — the source

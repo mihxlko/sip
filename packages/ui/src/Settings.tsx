@@ -42,6 +42,10 @@ export default function Settings({ platform, onClose }: Props) {
   const clockRef = useRef<HTMLInputElement>(null)
   const clockCaretRef = useRef<number | null>(null)
   const modalRef = useRef<HTMLDivElement>(null)
+  // Arms the theme-transition CSS for the next data-theme flip. Set only by an
+  // explicit user pick (changeTheme), so load/getPrefs never animates.
+  const themeAnimRef = useRef(false)
+  const themeTransTimer = useRef<ReturnType<typeof setTimeout>>()
 
   useEffect(() => {
     let live = true
@@ -59,11 +63,34 @@ export default function Settings({ platform, onClose }: Props) {
   // Apply data-theme to the modal div so [data-theme="dark"] in tokens.css
   // cascades into the shadow tree. Note: explicit 'light' on a dark-OS system
   // will still show dark (shadow :root always gets the media-query dark vars).
+  //
+  // When a user pick armed themeAnimRef, add data-theme-transitioning in the SAME
+  // update as the data-theme flip (per the CSS transitions spec, transition-property
+  // is read from the after-change style, so this animates without a forced reflow),
+  // then strip it on a timer so the gated rule only exists during the window.
   useEffect(() => {
-    if (!modalRef.current) return
-    if (prefs.theme === 'dark') modalRef.current.setAttribute('data-theme', 'dark')
-    else modalRef.current.removeAttribute('data-theme')
+    const el = modalRef.current
+    if (!el) return
+    if (themeAnimRef.current) {
+      themeAnimRef.current = false
+      el.setAttribute('data-theme-transitioning', '')
+      clearTimeout(themeTransTimer.current)
+      themeTransTimer.current = setTimeout(() => {
+        el.removeAttribute('data-theme-transitioning')
+      }, 350)
+    }
+    if (prefs.theme === 'dark') el.setAttribute('data-theme', 'dark')
+    else el.removeAttribute('data-theme')
   }, [prefs.theme])
+
+  useEffect(() => () => clearTimeout(themeTransTimer.current), [])
+
+  // User-initiated theme change — arms the transition, then updates prefs. The
+  // arm is consumed by the data-theme effect above on the resulting re-render.
+  function changeTheme(theme: SipPrefs['theme']) {
+    themeAnimRef.current = true
+    update({ theme })
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -258,7 +285,7 @@ export default function Settings({ platform, onClose }: Props) {
 
         {/* ── header ── */}
         <div className="absolute top-0 left-0 right-0 z-10 flex items-start justify-between">
-          <img src={platform.getIconUrl(32, dark)} width={32} height={32} alt="SIP" style={{ display: 'block' }} />
+          <ThemedLogo platform={platform} size={32} assetSize={32} dark={dark} />
           <button
             onClick={onClose}
             aria-label="Close"
@@ -423,19 +450,30 @@ export default function Settings({ platform, onClose }: Props) {
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
               <span className="text-text-muted text-lg font-medium shrink-0">Every:</span>
-              <div className="flex-1 self-stretch rounded-xs shadow-subtle flex items-center gap-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {Math.floor(prefs.intervalMinutes / 60) > 0 && (
-                  <span className="text-lg font-medium text-text-primary inline-flex items-center">
-                    <span>{Math.floor(prefs.intervalMinutes / 60)}</span>
-                    <span className="ml-1">{Math.floor(prefs.intervalMinutes / 60) === 1 ? 'Hour' : 'Hours'}</span>
-                  </span>
-                )}
-                {prefs.intervalMinutes % 60 > 0 && (
-                  <span className="text-lg font-medium text-text-primary inline-flex items-center">
-                    <span>{prefs.intervalMinutes % 60}</span>
-                    <span className="ml-1">{prefs.intervalMinutes % 60 === 1 ? 'Minute' : 'Minutes'}</span>
-                  </span>
-                )}
+              <div className="flex-1 self-stretch rounded-xs shadow-subtle grid" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {/* Ghost sizer — an invisible copy of the widest possible interval
+                    ("23 Hours 59 Minutes"). It shares this grid cell with the real
+                    value, so the cell is always sized for the longest state and the
+                    card never reflows as the value changes. Same classes = same
+                    width, so it self-adjusts if the font or wording ever changes. */}
+                <div aria-hidden className="invisible col-start-1 row-start-1 flex items-center gap-xs whitespace-nowrap">
+                  <span className="text-lg font-medium inline-flex items-center"><span>23</span><span className="ml-1">Hours</span></span>
+                  <span className="text-lg font-medium inline-flex items-center"><span>59</span><span className="ml-1">Minutes</span></span>
+                </div>
+                <div className="col-start-1 row-start-1 flex items-center gap-xs">
+                  {Math.floor(prefs.intervalMinutes / 60) > 0 && (
+                    <span className="text-lg font-medium text-text-primary inline-flex items-center">
+                      <span>{Math.floor(prefs.intervalMinutes / 60)}</span>
+                      <span className="ml-1">{Math.floor(prefs.intervalMinutes / 60) === 1 ? 'Hour' : 'Hours'}</span>
+                    </span>
+                  )}
+                  {prefs.intervalMinutes % 60 > 0 && (
+                    <span className="text-lg font-medium text-text-primary inline-flex items-center">
+                      <span>{prefs.intervalMinutes % 60}</span>
+                      <span className="ml-1">{prefs.intervalMinutes % 60 === 1 ? 'Minute' : 'Minutes'}</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -452,7 +490,7 @@ export default function Settings({ platform, onClose }: Props) {
               >
                 {prefs.customIcon
                   ? <img src={prefs.customIcon} alt="custom" style={{ maxWidth: 63, maxHeight: 63, objectFit: 'contain', display: 'block' }} />
-                  : <img src={platform.getIconUrl(64, dark)} width={63} height={63} alt="SIP" style={{ objectFit: 'contain', display: 'block' }} />
+                  : <ThemedLogo platform={platform} size={63} assetSize={64} dark={dark} />
                 }
               </div>
               <button
@@ -473,7 +511,7 @@ export default function Settings({ platform, onClose }: Props) {
               onKeyDown={e => e.key === ' ' && update({ showLogo: !prefs.showLogo })}
             >
               <div
-                className="border-0.5 border-border-default rounded-xs shadow-subtle flex items-center justify-center shrink-0 overflow-clip bg-surface-elevated"
+                className="border-0.5 border-border-emphasis rounded-xs shadow-subtle flex items-center justify-center shrink-0 overflow-clip bg-surface-elevated"
                 style={{ width: 18, height: 18 }}
               >
                 {prefs.showLogo && (
@@ -495,7 +533,7 @@ export default function Settings({ platform, onClose }: Props) {
               {(['system', 'light', 'dark'] as const).map(theme => (
                 <button
                   key={theme}
-                  onClick={() => update({ theme })}
+                  onClick={() => changeTheme(theme)}
                   className={`cursor-pointer flex items-center gap-1 rounded-md px-0.5 py-1 border-0 outline-none appearance-none w-full ${
                     prefs.theme === theme
                       ? 'bg-state-selected text-text-secondary'
@@ -521,6 +559,29 @@ export default function Settings({ platform, onClose }: Props) {
         </div>{/* /settings-controls */}
     </div>
     </>
+  )
+}
+
+// ─── themed logo (light/dark crossfade) ───────────────────────────────────────
+// The SIP logo is a raster asset that swaps per theme (getIconUrl(_, dark)), so a
+// color transition can't interpolate it — it would hard-pop mid-animation. Instead
+// we stack both variants and crossfade opacity. Both stay mounted (no load flash);
+// the opacity change only animates while [data-theme-transitioning] is armed
+// (tokens.css), so outside a theme switch it swaps instantly.
+function ThemedLogo({
+  platform, size, dark, assetSize, radius,
+}: {
+  platform: SipPlatform; size: number; dark: boolean; assetSize: 16 | 32 | 64 | 128; radius?: number
+}) {
+  const layer: React.CSSProperties = {
+    position: 'absolute', inset: 0, width: '100%', height: '100%',
+    objectFit: 'contain', display: 'block', borderRadius: radius,
+  }
+  return (
+    <span style={{ position: 'relative', display: 'inline-block', width: size, height: size }}>
+      <img src={platform.getIconUrl(assetSize, false)} alt="SIP" style={{ ...layer, opacity: dark ? 0 : 1 }} />
+      <img src={platform.getIconUrl(assetSize, true)} alt="" aria-hidden style={{ ...layer, opacity: dark ? 1 : 0 }} />
+    </span>
   )
 }
 
@@ -563,7 +624,7 @@ function ToastPreview({ platform, prefs, dark }: { platform: SipPlatform; prefs:
                   <div className="shrink-0">
                     {prefs.customIcon
                       ? <img src={prefs.customIcon} width={28} height={18} className="block rounded-md object-cover" />
-                      : <img src={platform.getIconUrl(32, dark)} width={16} height={16} alt="SIP" style={{ display: 'block', borderRadius: 4 }} />
+                      : <ThemedLogo platform={platform} size={16} assetSize={32} dark={dark} radius={4} />
                     }
                   </div>
                 )}
