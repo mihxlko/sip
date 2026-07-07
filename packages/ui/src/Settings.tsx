@@ -41,7 +41,6 @@ export default function Settings({ platform, onClose }: Props) {
   const clockTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const clockRef = useRef<HTMLInputElement>(null)
   const clockCaretRef = useRef<number | null>(null)
-  const modalRef = useRef<HTMLDivElement>(null)
   // Arms the theme-transition CSS for the next data-theme flip. Set only by an
   // explicit user pick (changeTheme), so load/getPrefs never animates.
   const themeAnimRef = useRef(false)
@@ -60,27 +59,39 @@ export default function Settings({ platform, onClose }: Props) {
     return () => { live = false }
   }, [platform])
 
-  // Apply data-theme to the modal div so [data-theme="dark"] in tokens.css
-  // cascades into the shadow tree. Note: explicit 'light' on a dark-OS system
-  // will still show dark (shadow :root always gets the media-query dark vars).
+  // Apply the theme on <html> — the single theme root for the settings page
+  // (main.tsx / page.tsx also drive var(--surface-base) on <html>). Doing it here
+  // too, synchronously on the state change, is what makes the switch immediate and
+  // animated: the debounced setPrefs → onPrefsChanged path re-applies the same
+  // value ~400ms later as a no-op. Set the explicit theme ('light' must be a real
+  // attribute, not just "not dark"); remove it for 'system' so the media query wins.
   //
   // When a user pick armed themeAnimRef, add data-theme-transitioning in the SAME
   // update as the data-theme flip (per the CSS transitions spec, transition-property
   // is read from the after-change style, so this animates without a forced reflow),
-  // then strip it on a timer so the gated rule only exists during the window.
-  useEffect(() => {
-    const el = modalRef.current
-    if (!el) return
+  // then strip it on a timer so the gated rule only exists during the window. It
+  // lives on <html> so the gated transition covers the page background and every
+  // card/border/shadow beneath it — not just the modal subtree.
+  //
+  // useLayoutEffect (not useEffect) is load-bearing: the clicked Appearance button
+  // also changes color via a React className swap (it gains bg-state-selected in the
+  // same render). A passive effect would flip <html>/arm one paint LATER, so the
+  // button's selection change would land unarmed in the prior paint and snap out of
+  // sync. Running synchronously before paint collapses the className swap, the theme
+  // flip, and the arming into one armed style update — so the button animates in
+  // lockstep with every card. ("Both land in the same style update.")
+  useLayoutEffect(() => {
+    const html = document.documentElement
     if (themeAnimRef.current) {
       themeAnimRef.current = false
-      el.setAttribute('data-theme-transitioning', '')
+      html.setAttribute('data-theme-transitioning', '')
       clearTimeout(themeTransTimer.current)
       themeTransTimer.current = setTimeout(() => {
-        el.removeAttribute('data-theme-transitioning')
+        html.removeAttribute('data-theme-transitioning')
       }, 350)
     }
-    if (prefs.theme === 'dark') el.setAttribute('data-theme', 'dark')
-    else el.removeAttribute('data-theme')
+    if (prefs.theme === 'system') html.removeAttribute('data-theme')
+    else html.setAttribute('data-theme', prefs.theme)
   }, [prefs.theme])
 
   useEffect(() => () => clearTimeout(themeTransTimer.current), [])
@@ -277,9 +288,8 @@ export default function Settings({ platform, onClose }: Props) {
       visibleToasts={3}
       toastOptions={{ unstyled: true }}
     />
-    {/* content root — also the data-theme target for token cascade into children */}
+    {/* content root */}
     <div
-      ref={modalRef}
       className="relative w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base p-gap-lg"
     >
 
@@ -443,7 +453,10 @@ export default function Settings({ platform, onClose }: Props) {
                 className="pointer-events-none select-none absolute inset-0 flex items-center justify-center text-xl font-semibold leading-tight text-text-primary font-sans"
               >
                 {clockInput.slice(0, 2)}
-                <span className="text-text-tertiary">{clockInput[2]}</span>
+                {/* SF Pro Rounded centers the colon on the x-height band, so it reads
+                    low between full-height numerals. Nudge it up onto the numeral
+                    optical center. em-based → scales with --text-xl; transform → no reflow. */}
+                <span className="text-text-tertiary translate-y-[-0.08em]">{clockInput[2]}</span>
                 {clockInput.slice(3)}
               </div>
             </div>
@@ -591,7 +604,7 @@ function ToastPreview({ platform, prefs, dark }: { platform: SipPlatform; prefs:
   const src = platform.getBottleUrl(prefs.bottleType, prefs.bottleColor)
 
   return (
-    <div className="w-[450px] bg-surface-elevated border-0.5 border-border-emphasis rounded-xl shadow p-pad-xl flex flex-col overflow-clip">
+    <div className="w-full max-w-[450px] bg-surface-elevated border-0.5 border-border-emphasis rounded-xl shadow p-pad-xl flex flex-col overflow-clip">
 
       {/* ── inner row: toast-left + close × ── */}
       <div className="flex gap-gap-xl items-start justify-between">

@@ -67,7 +67,7 @@ export default {
         sm: ['var(--text-sm)', { lineHeight: 'var(--leading-normal)' }], // 12px / 1.5
         md: ['var(--text-md)', { lineHeight: 'var(--leading-normal)' }], // 14px / 1.5
         lg: ['var(--text-lg)', { lineHeight: 'var(--leading-normal)' }], // 16px / 1.5
-        xl: ['var(--text-xl)', { lineHeight: 'var(--leading-tight)'  }], // 60px / 1.25
+        xl: ['var(--text-xl)', { lineHeight: 'var(--leading-tight)'  }], // 80px / 1.25
       },
 
       fontWeight: {
