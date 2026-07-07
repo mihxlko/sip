@@ -279,7 +279,7 @@ export default function Settings({ platform, onClose }: Props) {
                 value={prefs.titleText}
                 maxLength={40}
                 onChange={e => update({ titleText: e.target.value })}
-                className="bg-surface-raised border-0.5 border-border-emphasis focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none w-full box-border font-sans appearance-none"
+                className="bg-surface-raised border-0.5 border-border-emphasis hover:border-border-focus focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none focus:outline focus:outline-[0.5px] focus:outline-border-focus focus:outline-offset-0 w-full box-border font-sans appearance-none"
               />
             </div>
 
@@ -293,7 +293,7 @@ export default function Settings({ platform, onClose }: Props) {
                 value={prefs.messageText}
                 maxLength={60}
                 onChange={e => update({ messageText: e.target.value })}
-                className="bg-surface-raised border-0.5 border-border-emphasis focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none w-full box-border font-sans resize-none"
+                className="bg-surface-raised border-0.5 border-border-emphasis hover:border-border-focus focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none focus:outline focus:outline-[0.5px] focus:outline-border-focus focus:outline-offset-0 w-full box-border font-sans resize-none"
                 style={{ height: 72 }}
               />
             </div>
@@ -314,7 +314,7 @@ export default function Settings({ platform, onClose }: Props) {
               onKeyDown={handleClockKeyDown}
               placeholder="HH:MM"
               maxLength={5}
-              className="border-0.5 border-border-emphasis focus:border-border-focus rounded-xl px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none bg-surface-raised font-sans appearance-none"
+              className="border-0.5 border-border-emphasis hover:border-border-focus focus:border-border-focus rounded-xl px-pad-md py-pad-md text-xl font-semibold text-text-primary leading-tight text-center w-full outline-none focus:outline focus:outline-[0.5px] focus:outline-border-focus focus:outline-offset-0 bg-surface-raised font-sans appearance-none"
             />
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
