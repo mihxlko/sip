@@ -306,7 +306,7 @@ export default function Settings({ platform, onClose }: Props) {
         </div>
 
         {/* ── settings-controls: preview + bottom-controls ── */}
-        <div className="w-full max-w-[850px] mx-auto flex flex-col gap-gap-lg">
+        <div className="w-full max-w-[872px] mx-auto flex flex-col gap-gap-lg">
 
         {/* ── preview panel ── */}
         <div className="bg-surface-primary rounded-xxl shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg">
