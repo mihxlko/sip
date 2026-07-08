@@ -299,14 +299,14 @@ export default function Settings({ platform, onClose }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="cursor-pointer text-text-muted bg-transparent border-0 p-0 outline-none leading-none appearance-none"
+            className="cursor-pointer text-text-muted hover:text-text-tertiary transition-colors bg-transparent border-0 p-0 outline-none leading-none appearance-none"
           >
             <XIcon size={15} />
           </button>
         </div>
 
         {/* ── settings-controls: preview + bottom-controls ── */}
-        <div className="w-full max-w-[850px] mx-auto flex flex-col gap-gap-lg">
+        <div className="w-full max-w-[872px] mx-auto flex flex-col gap-gap-lg">
 
         {/* ── preview panel ── */}
         <div className="bg-surface-primary rounded-xxl shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg">
@@ -347,7 +347,7 @@ export default function Settings({ platform, onClose }: Props) {
                   <button
                     key={type}
                     onClick={() => update({ bottleType: type })}
-                    className={`cursor-pointer relative overflow-clip rounded-md border-0.5 shadow-subtle flex items-center justify-center appearance-none p-0 outline-none ${
+                    className={`btn-press cursor-pointer relative overflow-clip rounded-md border-0.5 shadow-subtle flex items-center justify-center appearance-none p-0 outline-none ${
                       prefs.bottleType === type
                         ? 'bg-state-selected border-border-emphasis'
                         : 'bg-surface-base border-border-default'
@@ -369,13 +369,13 @@ export default function Settings({ platform, onClose }: Props) {
                     key={color}
                     onClick={() => update({ bottleColor: color })}
                     aria-label={color}
-                    className="cursor-pointer overflow-clip shadow-subtle appearance-none p-0 outline-none"
+                    className="btn-press cursor-pointer overflow-clip shadow-subtle appearance-none p-0 outline-none"
                     style={{
                       width: 34, height: 34,
                       borderRadius: 'var(--radius-sm)',
                       backgroundColor: BOTTLE_COLORS[color],
-                      outline: prefs.bottleColor === color ? '2px solid var(--border-focus)' : undefined,
-                      outlineOffset: prefs.bottleColor === color ? 0.5 : undefined,
+                      outline: prefs.bottleColor === color ? `2px solid ${BOTTLE_COLORS[color]}` : undefined,
+                      outlineOffset: prefs.bottleColor === color ? 1 : undefined,
                     }}
                   />
                 ))}
@@ -508,7 +508,7 @@ export default function Settings({ platform, onClose }: Props) {
               </div>
               <button
                 onClick={pickIcon}
-                className="cursor-pointer bg-transparent border-0 outline-none appearance-none p-0 text-sm font-medium text-text-tertiary hover:text-text-primary"
+                className="cursor-pointer bg-transparent border-0 outline-none appearance-none p-0 text-sm font-medium text-text-tertiary hover:text-text-primary transition-colors"
               >
                 Upload Custom
               </button>
