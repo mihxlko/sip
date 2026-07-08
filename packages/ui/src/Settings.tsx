@@ -347,7 +347,7 @@ export default function Settings({ platform, onClose }: Props) {
                   <button
                     key={type}
                     onClick={() => update({ bottleType: type })}
-                    className={`cursor-pointer relative overflow-clip rounded-md border-0.5 shadow-subtle flex items-center justify-center appearance-none p-0 outline-none ${
+                    className={`btn-press cursor-pointer relative overflow-clip rounded-md border-0.5 shadow-subtle flex items-center justify-center appearance-none p-0 outline-none ${
                       prefs.bottleType === type
                         ? 'bg-state-selected border-border-emphasis'
                         : 'bg-surface-base border-border-default'
@@ -369,13 +369,13 @@ export default function Settings({ platform, onClose }: Props) {
                     key={color}
                     onClick={() => update({ bottleColor: color })}
                     aria-label={color}
-                    className="cursor-pointer overflow-clip shadow-subtle appearance-none p-0 outline-none"
+                    className="btn-press cursor-pointer overflow-clip shadow-subtle appearance-none p-0 outline-none"
                     style={{
                       width: 34, height: 34,
                       borderRadius: 'var(--radius-sm)',
                       backgroundColor: BOTTLE_COLORS[color],
-                      outline: prefs.bottleColor === color ? '2px solid var(--border-focus)' : undefined,
-                      outlineOffset: prefs.bottleColor === color ? 0.5 : undefined,
+                      outline: prefs.bottleColor === color ? `2px solid ${BOTTLE_COLORS[color]}` : undefined,
+                      outlineOffset: prefs.bottleColor === color ? 1 : undefined,
                     }}
                   />
                 ))}
