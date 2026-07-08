@@ -299,7 +299,7 @@ export default function Settings({ platform, onClose }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="cursor-pointer text-text-muted bg-transparent border-0 p-0 outline-none leading-none appearance-none"
+            className="cursor-pointer text-text-muted hover:text-text-tertiary transition-colors bg-transparent border-0 p-0 outline-none leading-none appearance-none"
           >
             <XIcon size={15} />
           </button>
@@ -508,7 +508,7 @@ export default function Settings({ platform, onClose }: Props) {
               </div>
               <button
                 onClick={pickIcon}
-                className="cursor-pointer bg-transparent border-0 outline-none appearance-none p-0 text-sm font-medium text-text-tertiary hover:text-text-primary"
+                className="cursor-pointer bg-transparent border-0 outline-none appearance-none p-0 text-sm font-medium text-text-tertiary hover:text-text-primary transition-colors"
               >
                 Upload Custom
               </button>
