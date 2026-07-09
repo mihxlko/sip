@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { type Theme } from '@sip/types'
 import { webPlatform } from '../platform'
+import NavLinks from '../components/NavLinks'
 
 // Settings reads `window` during render (theme/media-query resolution), so it
 // must never be server-rendered — load it client-only.
@@ -23,7 +24,7 @@ export default function Page() {
 
   return (
     <div className="w-full max-w-[2240px] mx-auto p-pad-xl box-border">
-      <Settings platform={webPlatform} onClose={() => window.close()} />
+      <Settings platform={webPlatform} onClose={() => window.close()} headerRight={<NavLinks />} />
     </div>
   )
 }

@@ -7,6 +7,10 @@
 
 html {
   background: var(--surface-base);
+  /* no-horizontal-scroll rule (design-docs.md): backstop, not a fix — the x-axis
+     must stay inert even where layout overflows. clip > hidden: it forbids
+     programmatic/focus scrolling too and creates no scroll container. */
+  overflow-x: clip;
 }
 
 body {

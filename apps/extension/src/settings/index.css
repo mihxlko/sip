@@ -8,6 +8,10 @@
 html {
   background: var(--surface-base);
   overscroll-behavior-x: none;
+  /* no-horizontal-scroll rule (design-docs.md): backstop, not a fix — the x-axis
+     must stay inert even where layout overflows. clip > hidden: it forbids
+     programmatic/focus scrolling too and creates no scroll container. */
+  overflow-x: clip;
 }
 
 body {
@@ -17,6 +21,9 @@ body {
 #root {
   width: 100%;
   max-width: 2240px;
+  /* centered to match the web shell — the fixed nav centers on the viewport,
+     so the content column must too or they misalign past 2240px */
+  margin-inline: auto;
   padding: var(--space-padding-xl);
   box-sizing: border-box;
 }
