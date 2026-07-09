@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Toaster, toast as sonnerToast } from 'sonner'
 import {
   BottleColor, BottleType, DEFAULT_PREFS, type SipPlatform, type SipPrefs,
@@ -32,9 +32,11 @@ function resolveIsDark(theme: SipPrefs['theme']): boolean {
 
 // ─── settings ────────────────────────────────────────────────────────────────
 
-interface Props { platform: SipPlatform; onClose: () => void }
+// headerRight replaces the default close button on the header's right side —
+// the web app injects its nav links there; the extension omits it and keeps ×.
+interface Props { platform: SipPlatform; onClose: () => void; headerRight?: ReactNode }
 
-export default function Settings({ platform, onClose }: Props) {
+export default function Settings({ platform, onClose, headerRight }: Props) {
   const [prefs, setPrefsState] = useState<SipPrefs>(DEFAULT_PREFS)
   const [clockInput, setClockInput] = useState('00:15')
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -294,15 +296,44 @@ export default function Settings({ platform, onClose }: Props) {
     >
 
         {/* ── header ── */}
-        <div className="absolute top-0 left-0 right-0 z-10 flex items-start justify-between">
-          <ThemedLogo platform={platform} size={32} assetSize={32} dark={dark} />
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="cursor-pointer text-text-muted hover:text-text-tertiary transition-colors bg-transparent border-0 p-0 outline-none leading-none appearance-none"
-          >
-            <XIcon size={15} />
-          </button>
+        {/* Viewport-fixed nav: the brand and right-side actions stay put while
+            the page scrolls beneath them. No background band — cards must reach
+            the viewport top edge uncovered (no-horizontal-scroll / no-band rule,
+            see design-docs.md). pointer-events-none lets clicks and scrolls pass
+            through everywhere except the interactive right cluster. The inner
+            container mirrors both app shells (max-w 2240 + 20px padding) so the
+            at-rest position matches the old absolute header. */}
+        <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none">
+          <div className="w-full max-w-[2240px] mx-auto box-border px-pad-xl pt-pad-xl flex items-center justify-between">
+          {/* brand — identical on web and extension */}
+          <div className="flex items-center gap-2">
+            <ThemedLogo platform={platform} size={24} assetSize={64} dark={dark} />
+            {/* 14px/18px — between text-sm (13) and text-md (15), no token.
+                Wordmark gradient colors exist only in the design, not tokens.css. */}
+            <span
+              className="font-medium text-transparent bg-clip-text"
+              style={{
+                fontSize: 14,
+                lineHeight: '18px',
+                backgroundImage: 'linear-gradient(in oklab 180deg, oklab(75% -0.113 -0.049) 0%, oklab(53.6% -0.009 -0.212) 100%)',
+              }}
+            >
+              Sip Hydra
+            </span>
+          </div>
+          <div className="pointer-events-auto">
+            {headerRight ?? (
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="cursor-pointer text-text-muted hover:text-text-tertiary transition-colors bg-transparent border-0 p-0 outline-none leading-none appearance-none"
+              >
+                {/* 11 ≈ 15 scaled by the logo's 32→24 reduction */}
+                <XIcon size={11} />
+              </button>
+            )}
+          </div>
+          </div>
         </div>
 
         {/* ── settings-controls: preview + bottom-controls ── */}
