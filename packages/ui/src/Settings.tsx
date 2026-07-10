@@ -547,7 +547,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
 
             {/* show logo — checkbox 18×18: no token */}
             <div
-              className="flex items-center gap-pad-md cursor-pointer select-none"
+              className="btn-press-group flex items-center gap-pad-md cursor-pointer select-none"
               role="checkbox"
               aria-checked={prefs.showLogo}
               tabIndex={0}
@@ -555,7 +555,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
               onKeyDown={e => e.key === ' ' && update({ showLogo: !prefs.showLogo })}
             >
               <div
-                className="border-0.5 border-border-emphasis rounded-xs shadow-subtle flex items-center justify-center shrink-0 overflow-clip bg-surface-elevated"
+                className="btn-press-scale border-0.5 border-border-emphasis rounded-xs shadow-subtle flex items-center justify-center shrink-0 overflow-clip bg-surface-elevated"
                 style={{ width: 18, height: 18 }}
               >
                 {prefs.showLogo && (
