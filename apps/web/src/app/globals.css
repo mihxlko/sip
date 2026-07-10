@@ -16,3 +16,61 @@ html {
 body {
   margin: 0;
 }
+
+/* ── info modal open/close ─────────────────────────────────────────────────────
+   Shared modal recipe (see m-trak design-notes.md): open = fade + scale
+   0.94→1 over 160ms, close = the reverse over 130ms (exits slightly quicker),
+   both easeOutCubic. `both` fill mode is load-bearing on the exit — it holds
+   opacity:0 between animation-end and the useModalClose timeout unmount.
+   The 130ms exit duration must match the hook's default. */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes modal-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.94); }
+}
+
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-backdrop-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.info-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: modal-backdrop-in 160ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+.info-modal-backdrop--closing {
+  animation: modal-backdrop-out 130ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+.info-modal {
+  animation: modal-in 160ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+.info-modal--closing {
+  animation: modal-out 130ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .info-modal-backdrop,
+  .info-modal-backdrop--closing,
+  .info-modal,
+  .info-modal--closing {
+    animation: none;
+  }
+}
