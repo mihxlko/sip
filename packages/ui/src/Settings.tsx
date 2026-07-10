@@ -564,7 +564,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                   </span>
                 )}
               </div>
-              <span className="text-sm font-medium text-text-secondary hover:text-text-primary">Show Logo</span>
+              <span className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">Show Logo</span>
             </div>
           </div>
 
@@ -671,7 +671,11 @@ function ToastPreview({ platform, prefs, dark }: { platform: SipPlatform; prefs:
                   {prefs.titleText || 'Title'}
                 </span>
                 {prefs.showLogo && (
-                  <div className="shrink-0">
+                  /* flex (not block): a block wrapper gets a 24px text line box
+                     (base line-height strut) around the 16px logo, inflating the
+                     title row and shifting the whole toast when toggled. flex
+                     shrink-wraps to the logo so items-center can truly center it. */
+                  <div className="shrink-0 flex">
                     {prefs.customIcon
                       ? <img src={prefs.customIcon} width={28} height={18} className="block rounded-md object-cover" />
                       : <ThemedLogo platform={platform} size={16} assetSize={32} dark={dark} radius={4} />
