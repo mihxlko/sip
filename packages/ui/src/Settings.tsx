@@ -326,7 +326,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="cursor-pointer text-text-muted hover:text-text-tertiary transition-colors bg-transparent border-0 p-0 outline-none leading-none appearance-none"
+                className="cursor-pointer text-text-muted hover:text-text-secondary transition-colors bg-transparent border-0 p-0 outline-none leading-none appearance-none"
               >
                 {/* 11 ≈ 15 scaled by the logo's 32→24 reduction */}
                 <XIcon size={11} />
@@ -618,7 +618,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
 // we stack both variants and crossfade opacity. Both stay mounted (no load flash);
 // the opacity change only animates while [data-theme-transitioning] is armed
 // (tokens.css), so outside a theme switch it swaps instantly.
-function ThemedLogo({
+export function ThemedLogo({
   platform, size, dark, assetSize, radius,
 }: {
   platform: SipPlatform; size: number; dark: boolean; assetSize: 16 | 32 | 64 | 128; radius?: number
@@ -698,7 +698,7 @@ function ToastPreview({ platform, prefs, dark }: { platform: SipPlatform; prefs:
 
 // ─── icons ────────────────────────────────────────────────────────────────────
 
-function XIcon({ size = 10 }: { size?: number }) {
+export function XIcon({ size = 10 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 8 8" fill="currentColor">
       <path d="M6.8 7.6L0.4 1.2C0.181 0.981 0.181 0.619 0.4 0.4C0.619 0.181 0.981 0.181 1.2 0.4L7.6 6.8C7.819 7.019 7.819 7.381 7.6 7.6C7.381 7.819 7.019 7.819 6.8 7.6Z" />
