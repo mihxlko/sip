@@ -141,7 +141,12 @@ export default function InfoModal({ onClose }: { onClose: () => void }) {
           >
             mihalko.us
           </a>
-          <span className="text-md font-medium text-text-muted">©2026</span>
+          <div className="flex items-center gap-2">
+            <span className="text-md font-medium text-text-muted">
+              v{process.env.NEXT_PUBLIC_APP_VERSION}
+            </span>
+            <span className="text-md font-medium text-text-muted">©2026</span>
+          </div>
         </div>
       </div>
     </div>

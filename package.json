@@ -9,7 +9,8 @@
     "apps/*"
   ],
   "scripts": {
-    "sync-dark-tokens": "node scripts/sync-dark-tokens.js"
+    "sync-dark-tokens": "node scripts/sync-dark-tokens.js",
+    "release": "node scripts/release.js"
   },
   "devDependencies": {
     "playwright": "^1.61.1"

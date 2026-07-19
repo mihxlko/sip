@@ -1,7 +1,9 @@
 node_modules/
 dist/
+releases/
 .next/
 next-env.d.ts
 
 # personal design/notes docs (see gitignore-notes-md-convention memory)
 design-docs.md
+dev-notes.md
