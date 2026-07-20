@@ -15,7 +15,7 @@ function applyTheme(theme: Theme) {
 
 export default function PrivacyPage() {
   useEffect(() => {
-    document.title = 'SIP — Privacy Policy'
+    document.title = 'Sip — Privacy Policy'
     webPlatform.getPrefs().then(p => applyTheme(p.theme))
     return webPlatform.onPrefsChanged(p => applyTheme(p.theme))
   }, [])
@@ -46,17 +46,17 @@ export default function PrivacyPage() {
           </p>
 
           <p className="m-0">
-            SIP requests only the permissions it needs to function: <strong>alarms</strong> to
-            schedule your hydration reminders, <strong>notifications</strong> to display them,
-            and <strong>storage</strong> to remember your preferences between sessions. To show
-            a reminder on top of the page you’re currently viewing, SIP runs a small content
+            Sip requests only the permissions it needs to function: alarms to
+            schedule your hydration reminders, notifications to display them, and
+            storage to remember your preferences between sessions. To show
+            a reminder on top of the page you’re currently viewing, Sip runs a small content
             script — but it never reads, stores, or transmits the content of the web pages you
             visit. None of these permissions are used to gather information about you or your
             browsing activity.
           </p>
 
           <p className="m-0">
-            SIP contains no analytics, no tracking, no advertising, and no third-party
+            Sip contains no analytics, no tracking, no advertising, and no third-party
             services. Because your data lives only on your device, you can remove it at any
             time by clearing your browser data or uninstalling the extension.
           </p>
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
             Questions about this policy? Contact us at{' '}
             <a
               href="mailto:a7.mihalko@gmail.com"
-              className="font-normal text-text-secondary no-underline hover:text-text-primary transition-colors"
+              className="font-normal text-text-tertiary no-underline hover:text-text-primary transition-colors"
             >
               a7.mihalko@gmail.com
             </a>
