@@ -9,6 +9,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ThemedLogo, XIcon } from '@sip/ui'
 import { webPlatform } from '../platform'
 import { useModalClose } from '../hooks/useModalClose'
+import { CHROME_STORE_URL } from '../links'
 
 // Resolved theme for the stacked-logo crossfade: explicit data-theme wins,
 // otherwise system preference. Mirrors Settings' resolveIsDark, but tracked
@@ -37,8 +38,8 @@ function useIsDark() {
 
 // Icon + label + arrow row. Same hover treatment as the top-nav links
 // (tertiary → secondary, transition-colors); currentColor lets the icons
-// transition in lockstep with the text. No href yet → button, matching the
-// NavLinks no-dead-anchor convention.
+// transition in lockstep with the text. href → anchor, else button — same
+// no-dead-anchor convention as NavLinks.
 function LinkRow({ href, icon, children }: { href?: string; icon: ReactNode; children: string }) {
   const cls = 'cursor-pointer flex items-center gap-2 bg-transparent border-0 p-0 appearance-none outline-none no-underline text-md font-medium text-text-tertiary hover:text-text-secondary transition-colors'
   const content = (
@@ -125,8 +126,7 @@ export default function InfoModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="flex flex-col items-start gap-xs">
-            {/* Chrome Web Store link lands later — button for now */}
-            <LinkRow icon={<ChromeIcon />}>Download</LinkRow>
+            <LinkRow href={CHROME_STORE_URL} icon={<ChromeIcon />}>Download</LinkRow>
             <LinkRow href="https://github.com/mihxlko/sip" icon={<GitHubIcon />}>Code</LinkRow>
           </div>
         </div>
