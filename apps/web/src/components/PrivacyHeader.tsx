@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { ThemedLogo } from '@sip/ui'
 import { type SipPrefs } from '@sip/types'
 import { webPlatform } from '../platform'
+import { CHROME_STORE_URL } from '../links'
 
 // Same resolution the Settings header uses: explicit theme wins, else follow the
 // OS media query. Kept local so this header stands alone without Settings.
@@ -51,13 +52,15 @@ export default function PrivacyHeader() {
           </span>
         </Link>
         <div className="pointer-events-auto">
-          <button
-            type="button"
-            className="cursor-pointer bg-transparent border-0 p-0 appearance-none outline-none font-medium text-text-tertiary hover:text-text-secondary transition-colors"
+          <a
+            href={CHROME_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cursor-pointer bg-transparent border-0 p-0 appearance-none outline-none no-underline font-medium text-text-tertiary hover:text-text-secondary transition-colors"
             style={{ fontSize: 14, lineHeight: '18px' }}
           >
             Download
-          </button>
+          </a>
         </div>
       </div>
     </div>
