@@ -62,6 +62,14 @@
   --surface-primary:  var(--white);
   --surface-base:     var(--neutral-03);
 
+  /* Docked top-nav scrim. Derived from --surface-base via color-mix, so it
+     tracks light/dark automatically and needs no entry in the [data-theme]
+     blocks (nothing for sync-dark-tokens.js to mirror). Paired with a
+     backdrop blur; at scroll-0 it sits on --surface-base and is invisible,
+     so the docked bar only materialises once a card scrolls under it.
+     Tune the 80% here — it is the one knob for how solid the bar reads. */
+  --surface-nav-scrim: color-mix(in srgb, var(--surface-base) 80%, transparent);
+
   /* ── semantic: text (light defaults) ───────────────────────────────── */
   --text-primary:   var(--neutral-800);
   --text-secondary: var(--neutral-700);

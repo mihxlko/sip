@@ -291,8 +291,12 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
       toastOptions={{ unstyled: true }}
     />
     {/* content root */}
+    {/* dock:pt-[68px] clears the docked bar. The bar is 64 tall (20 top pad +
+        24 items + 20 bottom pad) and the cards should sit a gap-lg below it, so
+        content starts at 88 — minus the 20 the shells contribute above this
+        element = 68. Floating, the cards stay flush at 44 as before. */}
     <div
-      className="relative w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base p-gap-lg"
+      className="relative w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base p-gap-lg dock:pt-[68px]"
     >
 
         {/* ── header ── */}
@@ -301,10 +305,22 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
             the viewport top edge uncovered (no-horizontal-scroll / no-band rule,
             see design-docs.md). pointer-events-none lets clicks and scrolls pass
             through everywhere except the interactive right cluster. The inner
-            container mirrors both app shells (max-w 2240 + 20px padding) so the
-            at-rest position matches the old absolute header. */}
-        <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none">
-          <div className="w-full max-w-[2240px] mx-auto box-border px-pad-xl pt-pad-xl flex items-center justify-between">
+            container mirrors both app shells (max-w 2240, centered) and stretches
+            edge to edge, so the brand and the actions sit on the same 24px gutter
+            as the cards below at every width — including the stacked breakpoint,
+            where nav and card share one left/right edge. */}
+        {/* The nav stays `fixed` in BOTH states — "docked" is a fill plus a
+            content offset, not a change of positioning. Going in-flow would make
+            the bar reserve its own space, so the shells' compensating padding
+            would have to be unwound in exactly the `dock` ranges and the content
+            would jump at every boundary. Same look, far less to get wrong.
+            The scrim is 80% --surface-base + blur, so at scroll-0 it sits on the
+            page background and is invisible: the bar only materialises once a
+            card scrolls under it, which is the only moment it's needed.
+            pointer-events-auto comes back with the fill — a visible bar that
+            passes clicks through to the cards beneath reads as broken. */}
+        <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none dock:pointer-events-auto dock:bg-[var(--surface-nav-scrim)] dock:backdrop-blur-md">
+          <div className="w-full max-w-[2240px] mx-auto box-border px-gap-lg pt-pad-xl dock:pb-pad-xl flex items-center justify-between">
           {/* brand — identical on web and extension */}
           <div className="flex items-center gap-2">
             <ThemedLogo platform={platform} size={24} assetSize={64} dark={dark} />
@@ -337,10 +353,22 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
         </div>
 
         {/* ── settings-controls: preview + bottom-controls ── */}
-        <div className="w-full max-w-[872px] mx-auto flex flex-col gap-gap-lg">
+        {/* Two caps, one per layout. 872 is the two-column width. 450 is the
+            stacked one, and it's the toast's existing max-width — reused rather
+            than invented, so the preview card, the toast inside it and every
+            stacked card below share one left/right edge.
+            Without the 450 cap the column would run to 872 just under the
+            breakpoint, and the cards' justify-between rows (3 type thumbs, 6
+            swatches) would fling their items to opposite ends of an 850px card.
+            Below 450 the cap is inert and the cards simply fill the gutter. */}
+        <div className="w-full max-w-[450px] wide:max-w-[872px] mx-auto flex flex-col gap-gap-lg">
 
         {/* ── preview panel ── */}
-        <div className="bg-surface-primary rounded-xxl shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg">
+        {/* px-gap-lg below `wide`: the panel exists to frame the toast, and once
+            the column is capped at 450 the toast's own max-w-[450px] would fill it
+            edge to edge and the frame would read as an accident. 24px matches the
+            panel's own pb-gap-lg. At `wide` the 872px panel already has room. */}
+        <div className="bg-surface-primary rounded-xxl shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg px-gap-lg wide:px-0">
           <ToastPreview platform={platform} prefs={prefs} dark={dark} />
           {/* Test button: rounded-full = design's 25px radius — no exact token */}
           <button
@@ -352,16 +380,38 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
         </div>
 
         {/* ── bottom-controls: bottle | bottom-right-controls ── */}
-        <div className="flex flex-row gap-gap-lg items-stretch">
+        {/* Below `wide` this is the single stacking column for ALL five cards.
+            The two grouping wrappers below (bottom-right-controls, bottom-right-row)
+            go `display: contents`, which drops them out of the box tree and promotes
+            their cards to direct flex children here. That's what makes the stack
+            order fall out of the existing DOM order for free — Bottle, Text, Time,
+            Icon, Appearance — with no duplicated markup, no JSX reordering and one
+            `gap-gap-lg` governing all five. At `wide` the wrappers become boxes
+            again and the original two-column layout is restored untouched. */}
+        <div className="flex flex-col gap-gap-lg wide:flex-row wide:items-stretch">
 
-          {/* bottle card — flex-1: takes leftover space after the content-sized right column */}
-          <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
+          {/* bottle card — wide:flex-1: takes leftover space after the content-sized
+              right column. Only at `wide`: in the stacked column `flex-1` would
+              resolve against the main axis and stretch the card vertically. */}
+          <div className="wide:flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
             <span className="text-text-secondary text-md font-medium px-[8px]">Bottle</span>
 
-            {/* large preview — 250×250 with 50px inner padding */}
+            {/* large preview — 250 wide × 230 tall, no inner padding. (It used to
+                carry `p-space-padding-xl`, which is not a class this config can
+                generate — the spacing keys are `pad-*`, not `space-padding-*` — so
+                no padding was ever applied and the comment claiming 50px was
+                describing an intent that never shipped. Removed rather than
+                corrected to `p-pad-xxl`: the image is 200 tall in a 230 box, so
+                real 50px padding would squeeze it.)
+                250 is a hard width only inside the two-column row (where the card's
+                content box is 251 — i.e. it already fills it). Stacked, the card is
+                as wide as the viewport, so the preview fills it too: w-full keeps it
+                flush with the Type/Color rows below instead of stranding ~45px of
+                dead space, and it's what stops the widest box in the app from
+                dictating a 282px floor on a 320px screen. Height is unchanged. */}
             <div
-              className="bg-surface-base border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center overflow-clip p-space-padding-xl"
-              style={{ width: 250, height: 230 }}
+              className="w-full wide:w-[250px] bg-surface-base border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center overflow-clip"
+              style={{ height: 230 }}
             >
               <img
                 src={platform.getBottleUrl(prefs.bottleType, prefs.bottleColor)}
@@ -417,8 +467,10 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
           {/* bottom-right-controls: text-card on top, bottom-right-row below.
               Content-sized width (no flex-1) so bottle takes the leftover.
               justify-between distributes any extra height (from items-stretch on
-              the outer row) between the two children. */}
-          <div className="flex flex-col gap-gap-lg justify-between">
+              the outer row) between the two children.
+              Below `wide` this grouping has no meaning, so `contents` erases the
+              box and hands its children up to the stacking column. */}
+          <div className="contents wide:flex wide:flex-col wide:gap-gap-lg wide:justify-between">
 
           {/* text card */}
           <div className="w-full bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
@@ -456,10 +508,12 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
           </div>
 
           {/* ── bottom-right-row: time | icon | appearance ── */}
-          <div className="flex flex-row gap-gap-lg items-start">
+          {/* `contents` below `wide` — same reason as the wrapper above: the row
+              dissolves and Time / Icon / Appearance become stacked column items. */}
+          <div className="contents wide:flex wide:flex-row wide:gap-gap-lg wide:items-start">
 
-          {/* time card */}
-          <div className="flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
+          {/* time card — wide:flex-1 only; see the bottle card note on why */}
+          <div className="wide:flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Time</span>
 
             <div className="relative">
@@ -494,7 +548,11 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
               <span className="text-text-muted text-lg font-medium shrink-0">Every:</span>
-              <div className="flex-1 self-stretch rounded-xs shadow-subtle grid" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {/* shadow-subtle removed: this box has no background, so the shadow
+                  only ever drew a faint hairline under the text — invisible at the
+                  card's desktop width, but a visible stray line once the card goes
+                  full-width in the stacked layout. */}
+              <div className="flex-1 self-stretch rounded-xs grid" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {/* Ghost sizer — an invisible copy of the widest possible interval
                     ("23 Hours 59 Minutes"). It shares this grid cell with the real
                     value, so the cell is always sized for the longest state and the
@@ -522,12 +580,16 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
             </div>
           </div>
 
-          {/* icon card — w-[130px]: fixed width, natural content height */}
-          <div className="w-[130px] shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
+          {/* icon card — w-[130px]: fixed width, natural content height.
+              Full-width once stacked; the 130px slot only exists in the row. */}
+          <div className="w-full wide:w-[130px] wide:shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Icon</span>
 
-            {/* 100×100 preview — no token */}
-            <div className="flex flex-col items-center gap-xs">
+            {/* 100×100 preview — no token.
+                Centering is right in the 130px column, but in a stacked full-width
+                card it strands the icon mid-card away from the "Icon" label and the
+                "Show Logo" row; left-align it there so the card reads as one edge. */}
+            <div className="flex flex-col items-start wide:items-center gap-xs">
               <div
                 className="border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center bg-surface-base"
                 style={{ width: 100, height: 100 }}
@@ -568,8 +630,9 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
             </div>
           </div>
 
-          {/* appearance card — w-[130px]: no token, matches popup */}
-          <div className="w-[130px] shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
+          {/* appearance card — w-[130px]: no token, matches popup.
+              Full-width once stacked; the 130px slot only exists in the row. */}
+          <div className="w-full wide:w-[130px] wide:shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
             <span className="text-text-secondary text-md font-medium pl-[4px]">Appearance</span>
 
             {/* button group — no chrome; container is just the buttons */}

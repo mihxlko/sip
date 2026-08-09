@@ -34,8 +34,13 @@ export default function PrivacyHeader() {
   }, [])
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none">
-      <div className="w-full max-w-[2240px] mx-auto box-border px-pad-xl pt-pad-xl flex items-center justify-between">
+    // Docks on `dock-doc` (< 977px) for the same reason the app nav docks — see
+    // the Settings header. No content offset is needed to match: the column
+    // below already clears the 64px bar with its pt-[120px].
+    <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none dock-doc:pointer-events-auto dock-doc:bg-[var(--surface-nav-scrim)] dock-doc:backdrop-blur-md">
+      {/* px-gap-lg matches the Settings header exactly — both navs stretch edge
+          to edge on the app's single 24px gutter. */}
+      <div className="w-full max-w-[2240px] mx-auto box-border px-gap-lg pt-pad-xl dock-doc:pb-pad-xl flex items-center justify-between">
         {/* brand → home (sip-hydra.vercel.app) */}
         <Link href="/" className="pointer-events-auto flex items-center gap-2 no-underline">
           <ThemedLogo platform={webPlatform} size={24} assetSize={64} dark={dark} />
