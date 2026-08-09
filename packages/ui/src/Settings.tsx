@@ -396,7 +396,13 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
           <div className="wide:flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
             <span className="text-text-secondary text-md font-medium px-[8px]">Bottle</span>
 
-            {/* large preview — 250×250 with 50px inner padding.
+            {/* large preview — 250 wide × 230 tall, no inner padding. (It used to
+                carry `p-space-padding-xl`, which is not a class this config can
+                generate — the spacing keys are `pad-*`, not `space-padding-*` — so
+                no padding was ever applied and the comment claiming 50px was
+                describing an intent that never shipped. Removed rather than
+                corrected to `p-pad-xxl`: the image is 200 tall in a 230 box, so
+                real 50px padding would squeeze it.)
                 250 is a hard width only inside the two-column row (where the card's
                 content box is 251 — i.e. it already fills it). Stacked, the card is
                 as wide as the viewport, so the preview fills it too: w-full keeps it
@@ -404,7 +410,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                 dead space, and it's what stops the widest box in the app from
                 dictating a 282px floor on a 320px screen. Height is unchanged. */}
             <div
-              className="w-full wide:w-[250px] bg-surface-base border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center overflow-clip p-space-padding-xl"
+              className="w-full wide:w-[250px] bg-surface-base border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center overflow-clip"
               style={{ height: 230 }}
             >
               <img
@@ -542,7 +548,11 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
 
             <div className="flex items-center justify-start gap-xs p-pad-md">
               <span className="text-text-muted text-lg font-medium shrink-0">Every:</span>
-              <div className="flex-1 self-stretch rounded-xs shadow-subtle grid" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {/* shadow-subtle removed: this box has no background, so the shadow
+                  only ever drew a faint hairline under the text — invisible at the
+                  card's desktop width, but a visible stray line once the card goes
+                  full-width in the stacked layout. */}
+              <div className="flex-1 self-stretch rounded-xs grid" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {/* Ghost sizer — an invisible copy of the widest possible interval
                     ("23 Hours 59 Minutes"). It shares this grid cell with the real
                     value, so the cell is always sized for the longest state and the
