@@ -291,8 +291,12 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
       toastOptions={{ unstyled: true }}
     />
     {/* content root */}
+    {/* dock:pt-[68px] clears the docked bar. The bar is 64 tall (20 top pad +
+        24 items + 20 bottom pad) and the cards should sit a gap-lg below it, so
+        content starts at 88 — minus the 20 the shells contribute above this
+        element = 68. Floating, the cards stay flush at 44 as before. */}
     <div
-      className="relative w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base p-gap-lg"
+      className="relative w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base p-gap-lg dock:pt-[68px]"
     >
 
         {/* ── header ── */}
@@ -305,8 +309,18 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
             edge to edge, so the brand and the actions sit on the same 24px gutter
             as the cards below at every width — including the stacked breakpoint,
             where nav and card share one left/right edge. */}
-        <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none">
-          <div className="w-full max-w-[2240px] mx-auto box-border px-gap-lg pt-pad-xl flex items-center justify-between">
+        {/* The nav stays `fixed` in BOTH states — "docked" is a fill plus a
+            content offset, not a change of positioning. Going in-flow would make
+            the bar reserve its own space, so the shells' compensating padding
+            would have to be unwound in exactly the `dock` ranges and the content
+            would jump at every boundary. Same look, far less to get wrong.
+            The scrim is 80% --surface-base + blur, so at scroll-0 it sits on the
+            page background and is invisible: the bar only materialises once a
+            card scrolls under it, which is the only moment it's needed.
+            pointer-events-auto comes back with the fill — a visible bar that
+            passes clicks through to the cards beneath reads as broken. */}
+        <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none dock:pointer-events-auto dock:bg-[var(--surface-nav-scrim)] dock:backdrop-blur-md">
+          <div className="w-full max-w-[2240px] mx-auto box-border px-gap-lg pt-pad-xl dock:pb-pad-xl flex items-center justify-between">
           {/* brand — identical on web and extension */}
           <div className="flex items-center gap-2">
             <ThemedLogo platform={platform} size={24} assetSize={64} dark={dark} />

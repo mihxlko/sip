@@ -12,14 +12,31 @@ export default {
     extend: {
 
       // ─── breakpoints ───────────────────────────────────────────────────────
-      // One breakpoint, derived — not picked. The settings column is capped at
-      // 872px and the bottom row's two columns can't shrink below it (250px
-      // bottle preview + fixed-width right column). 872 + 24px gutter × 2 = 920
-      // is therefore the exact width at which the desktop layout stops fitting.
+      // Two breakpoints, both derived — neither picked off a device table.
+      //
+      // `wide` is the card layout's. The settings column is capped at 872px and
+      // the bottom row's two columns can't shrink below it (250px bottle preview
+      // + fixed-width right column). 872 + 24px gutter × 2 = 920 is therefore the
+      // exact width at which the desktop layout stops fitting.
       //   < wide  → single column, all five cards stacked
       //   ≥ wide  → the full two-column layout, untouched
+      //
+      // `dock` is the top nav's own breakpoint, and it is TWO disjoint ranges in
+      // one variant (Tailwind emits them as a single comma-separated media query).
+      // The nav floats transparently over the page while its brand/links clusters
+      // clear the centred card column, and docks into a filled bar where they'd
+      // otherwise sit over a card as it scrolls under. Measured clearances, at a
+      // 24px minimum:
+      //   ≥ 1159      float  — 872px column, clearance grows with the viewport
+      //   920 – 1158  DOCK   — clusters overrun the 872px column (−95px at 921)
+      //   737 – 919   float  — cards restack to 450px, clearance jumps back to 120
+      //   ≤ 736       DOCK   — clusters overrun the 450px column
+      // The 920 edge is shared with the card restack, so that flip reads as one
+      // event; 1159 and 736 are the nav's own. Re-derive all three if the brand
+      // wordmark or the nav links change width.
       screens: {
         wide: '920px',
+        dock: [{ min: '920px', max: '1158px' }, { max: '736px' }],
       },
 
       // ─── colors ────────────────────────────────────────────────────────────
