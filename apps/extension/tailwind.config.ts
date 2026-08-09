@@ -11,6 +11,17 @@ export default {
   theme: {
     extend: {
 
+      // ─── breakpoints ───────────────────────────────────────────────────────
+      // One breakpoint, derived — not picked. The settings column is capped at
+      // 872px and the bottom row's two columns can't shrink below it (250px
+      // bottle preview + fixed-width right column). 872 + 24px gutter × 2 = 920
+      // is therefore the exact width at which the desktop layout stops fitting.
+      //   < wide  → single column, all five cards stacked
+      //   ≥ wide  → the full two-column layout, untouched
+      screens: {
+        wide: '920px',
+      },
+
       // ─── colors ────────────────────────────────────────────────────────────
       // All colors reference CSS custom properties so theme switching is
       // automatic at runtime — no JS class swapping needed.

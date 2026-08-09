@@ -24,6 +24,9 @@ body {
   /* centered to match the web shell — the fixed nav centers on the viewport,
      so the content column must too or they misalign past 2240px */
   margin-inline: auto;
-  padding: var(--space-padding-xl);
+  /* Vertical only — the horizontal gutter is owned by Settings' own 24px padding
+     so the nav, the card column and the 920px stacking breakpoint all derive
+     from one number. Mirrors apps/web/src/app/page.tsx. */
+  padding: var(--space-padding-xl) 0;
   box-sizing: border-box;
 }

@@ -21,7 +21,9 @@ export default function PrivacyPage() {
   }, [])
 
   return (
-    <div className="w-full max-w-[2240px] mx-auto p-pad-xl box-border">
+    // px-gap-lg, not p-pad-xl: same 24px gutter as the app shell so the header
+    // here lands on the same edge as the one on / (see PrivacyHeader).
+    <div className="w-full max-w-[2240px] mx-auto py-pad-xl px-gap-lg box-border">
       <PrivacyHeader />
 
       {/* centered column, ~700px, cleared below the fixed header */}

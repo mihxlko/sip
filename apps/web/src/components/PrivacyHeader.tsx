@@ -35,7 +35,9 @@ export default function PrivacyHeader() {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none">
-      <div className="w-full max-w-[2240px] mx-auto box-border px-pad-xl pt-pad-xl flex items-center justify-between">
+      {/* px-gap-lg matches the Settings header exactly — both navs stretch edge
+          to edge on the app's single 24px gutter. */}
+      <div className="w-full max-w-[2240px] mx-auto box-border px-gap-lg pt-pad-xl flex items-center justify-between">
         {/* brand → home (sip-hydra.vercel.app) */}
         <Link href="/" className="pointer-events-auto flex items-center gap-2 no-underline">
           <ThemedLogo platform={webPlatform} size={24} assetSize={64} dark={dark} />

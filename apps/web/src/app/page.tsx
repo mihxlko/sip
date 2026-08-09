@@ -23,7 +23,11 @@ export default function Page() {
   }, [])
 
   return (
-    <div className="w-full max-w-[2240px] mx-auto p-pad-xl box-border">
+    // Horizontal padding is deliberately NOT set here: the app gutter is owned in
+    // one place (Settings' own p-gap-lg = 24px) so the fixed nav, the card column
+    // and the stacking breakpoint (920 = 872 + 24×2) all derive from one number.
+    // Vertical padding stays — it's what the fixed nav's pt-pad-xl aligns to.
+    <div className="w-full max-w-[2240px] mx-auto py-pad-xl box-border">
       <Settings platform={webPlatform} onClose={() => window.close()} headerRight={<NavLinks />} />
     </div>
   )

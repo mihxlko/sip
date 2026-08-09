@@ -87,7 +87,14 @@ export default function InfoModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="About Sip Hydra"
-        className={`info-modal${closing ? ' info-modal--closing' : ''} bg-surface-base border-0.5 border-border-default rounded-[24px] p-gap-lg box-border w-[650px] max-w-[calc(100vw-40px)] h-[450px] flex flex-col justify-between overflow-clip`}
+        /* 650×450 is the design size, but both axes are targets, not mandates:
+           - max-w matches the app's 24px gutter (48 = 24×2), so the modal lines
+             up with the cards behind it instead of its own 20px inset.
+           - max-h + overflow-y-auto: at 450 fixed, a landscape phone (375 tall)
+             pushed the header — and the close button with it — 37px above the top
+             of the screen with no way to reach it. Both are inert whenever the
+             design size fits, so desktop is unchanged. */
+        className={`info-modal${closing ? ' info-modal--closing' : ''} bg-surface-base border-0.5 border-border-default rounded-[24px] p-gap-lg box-border w-[650px] max-w-[calc(100vw-48px)] h-[450px] max-h-[calc(100dvh-48px)] flex flex-col justify-between overflow-y-auto`}
         onMouseDown={e => e.stopPropagation()}
       >
         {/* ── header: brand row identical to the app top nav ── */}
