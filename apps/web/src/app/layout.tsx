@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import './globals.css'
+import DevAnnotation from '../components/DevAnnotation'
 
 export const metadata: Metadata = {
   title: 'SIP — Settings',
@@ -18,7 +19,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Renders nothing outside `next dev` — see DevAnnotation. */}
+        <DevAnnotation />
+      </body>
     </html>
   )
 }
