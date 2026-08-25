@@ -1,0 +1,2760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sip — Settings layout study (5 variations)</title>
+
+<!--
+  ────────────────────────────────────────────────────────────────────────────
+  SIP · SETTINGS INFORMATION-ARCHITECTURE STUDY
+  Self-contained prototype. Open directly (file://) — no build step.
+
+  THESIS BEING TESTED
+    The settings surface should never scroll, on any device. Everything the
+    user needs is either on screen or one tap away, and the toast preview is
+    always visible so every change is seen as it is made.
+
+  HOW THAT IS ACHIEVED HERE (two mechanisms, shared by all five variants)
+    1. IA — the five cards (Bottle / Text / Time / Icon / Appearance) stop
+       being five simultaneous boxes and become five VIEWS. One is on screen
+       at a time; the preview is persistent chrome.
+    2. Fluid sizing — every large element (bottle hero, type thumbs, swatches,
+       clock numerals, icon box, paddings, type scale) is sized in `cqh`
+       against the app container, not in fixed px. So the layout does not just
+       reflow at a breakpoint, it *shrinks to fit* the height it is given.
+
+  WHY CONTAINER QUERIES, NOT MEDIA QUERIES
+    The stage below can be resized to a device preset without resizing the
+    browser window. Media queries would ignore that; `@container app (...)`
+    responds to the stage, so the device frames are truthful previews.
+
+  THE FIVE VARIATIONS
+    1  Segmented        Preview on top, centred segmented control, one panel.
+                        Centred nav cluster (brand + links together).
+    2  Rail / Tab Bar   Vertical icon rail on desktop, bottom tab bar on
+                        mobile. The native-app reading.
+    3  Inspector Split  Preview is a permanent left canvas; the right side is
+                        a tabbed inspector. The pro-tool reading.
+    4  Control Dock     Preview is the hero on an empty stage; a floating dock
+                        summons a sheet of controls. Tap the active tab to
+                        dismiss and see the preview with zero chrome.
+    5  Adaptive         Spends space when it has it: shows all five sections
+                        at once when the container is roomy, collapses to
+                        preview + tabs when it is not. Watch the badge flip.
+    6  Editor           No navigation at all. Controls in a column on the LEFT,
+                        a stage standing in for the screen on the RIGHT with
+                        the toast at its configured position, stacking to
+                        pinned-stage-on-top on mobile. 1–5 all assume Sip is an
+                        app with a settings screen; 6 treats it as an editor
+                        whose settings ARE the content. Try the Position
+                        control — it is what the right-hand stage is for.
+    7  The design      Variant 6's layout with the real visual design on top
+                        (Paper export, Aug 24): recessed #F8F8F9 cards on a
+                        white page, four sections, rigid 290px control column,
+                        the Info modal, and a dark mode built by mirroring the
+                        light scheme's surface rule rather than re-inventing it.
+
+  THE CONTROL WIDGET (draggable — grab its title bar)
+    Variant switch, device frames, theme, and a live FIT / OVERFLOW readout
+    that measures whether anything is actually clipped. That readout is the
+    scoreboard for the thesis. Position and settings persist in localStorage.
+    Keys: 1–7 variants · [ ] cycle device frames · d toggle dark · h hide
+          · t toggle variant 6's Test button (an open question — A/B it).
+  ────────────────────────────────────────────────────────────────────────────
+-->
+
+<style>
+/* ═══ TOKENS ═══════════════════════════════════════════════════════════════
+   Copied verbatim from packages/ui/src/tokens.css so the prototype is a true
+   colour/spacing match. Do not hand-edit — re-copy if the source changes.  */
+:root {
+  --white:#FFFFFF; --black:#000000;
+  --neutral-03:#FBFBFB; --neutral-50:#F1F1F2; --neutral-75:#EAEAEC;
+  --neutral-100:#E3E3E5; --neutral-150:#D4D5D8; --neutral-200:#C6C7CC;
+  --neutral-300:#AAABB2; --neutral-400:#8D8F98; --neutral-500:#71737F;
+  --neutral-600:#5A5C65; --neutral-650:#4F5159; --neutral-700:#44454C;
+  --neutral-750:#333439; --neutral-800:#323338; --neutral-825:#2A2B30;
+  --neutral-850:#28282C; --neutral-875:#252529; --neutral-900:#222326;
+  --neutral-925:#1F2023; --neutral-950:#1C1D20; --neutral-997:#171719;
+
+  --red-500:#F75951;
+
+  --brand-primary-500:#51A0EA; --brand-secondary-500:#79D4EE;
+
+  --bottle-red:#E8362D; --bottle-orange:#F47E47; --bottle-yellow:#F2CE33;
+  --bottle-green:#00B97D; --bottle-blue:#5FB2EB; --bottle-purple:#B938F6;
+
+  --surface-elevated:var(--white); --surface-raised:var(--white);
+  --surface-primary:var(--white);  --surface-base:var(--neutral-03);
+
+  --text-primary:var(--neutral-800); --text-secondary:var(--neutral-700);
+  --text-tertiary:var(--neutral-400); --text-muted:var(--neutral-300);
+  --text-error:var(--red-500); --text-brand:var(--brand-primary-500);
+
+  --state-hover:rgba(0,0,0,.04); --state-active:rgba(0,0,0,.07);
+  --state-selected:rgba(0,0,0,.05);
+
+  --border-default:var(--neutral-100); --border-strong:var(--neutral-150);
+  --border-emphasis:var(--neutral-150); --border-focus:var(--neutral-150);
+
+  --font-sans:"SF Pro Rounded", ui-rounded, -apple-system, system-ui, sans-serif;
+
+  --font-medium:500; --font-semibold:600;
+  --leading-tight:1.25; --leading-normal:1.5;
+
+  --radius-xs:6px; --radius-sm:8px; --radius-md:10px;
+  --radius-lg:12px; --radius-xl:16px; --radius-xxl:20px;
+
+  --box-shadow-subtle:0px 1px 4px 0px rgba(0,0,0,.03);
+  --box-shadow-default:0px 2px 10px 0px rgba(0,0,0,.05);
+  --box-shadow-strong:0px 4px 10px 0px rgba(0,0,0,.05);
+
+  /* Shipped toast motion, copied from toast-styles.css. The prototype was
+     using 380ms / cubic-bezier(.22,.61,.36,1), which was close enough to look
+     right and wrong enough to be untrustworthy — the point of this file is
+     that what you feel here is what ships. Note --sip-ease-in is Sonner's
+     naming for the ENTRANCE curve, and its 1.02 control point means it
+     overshoots the resting position slightly before settling. */
+  --sip-enter-duration: 400ms;
+  --sip-exit-duration:  200ms;
+  --sip-ease-in:  cubic-bezier(0.21, 1.02, 0.73, 1);
+  --sip-ease-out: cubic-bezier(0.06, 0.59, 0.35, 1);
+
+  --shimmer-hue-min:0deg; --shimmer-hue-max:25deg; --shimmer-hue-duration:6s;
+  --shimmer-overlay-opacity-min:.03; --shimmer-overlay-opacity-max:.12;
+  --shimmer-overlay-duration:4s; --shimmer-ease:ease-in-out;
+}
+
+[data-theme="dark"] {
+  --surface-elevated:var(--neutral-800); --surface-raised:var(--neutral-850);
+  --surface-primary:var(--neutral-900);  --surface-base:var(--neutral-950);
+
+  --text-primary:var(--neutral-50); --text-secondary:var(--neutral-150);
+  --text-tertiary:var(--neutral-400); --text-muted:var(--neutral-500);
+
+  --state-hover:rgba(255,255,255,.03); --state-active:rgba(255,255,255,.10);
+  --state-selected:rgba(255,255,255,.08);
+
+  --border-default:var(--neutral-800); --border-strong:var(--neutral-750);
+  --border-emphasis:var(--neutral-700); --border-focus:var(--neutral-650);
+
+  --box-shadow-subtle:0px 1px 4px 0px rgba(113,115,127,0);
+  --box-shadow-default:0px 2px 10px 0px rgba(113,115,127,0);
+  --box-shadow-strong:0px 4px 10px 0px rgba(113,115,127,0);
+}
+
+/* Theme crossfade, ported from tokens.css — armed only for an explicit pick. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme-transitioning], [data-theme-transitioning] * {
+    transition: color 300ms ease-out, background-color 300ms ease-out,
+                border-color 300ms ease-out, outline-color 300ms ease-out,
+                box-shadow 300ms ease-out, opacity 300ms ease-out !important;
+  }
+}
+
+/* ═══ RESET / PAGE ═════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  height: 100%; margin: 0; overflow: hidden;
+  background: var(--surface-base);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; appearance: none; outline: none; }
+img { display: block; }
+
+/* Press spring, from tokens.css */
+.btn-press { transition: transform 350ms cubic-bezier(.34,1.56,.64,1); will-change: transform; }
+.btn-press:active { transform: scale(.96); transition-duration: 100ms; transition-timing-function: ease-out; }
+@media (prefers-reduced-motion: reduce) { .btn-press, .btn-press:active { transition: none; transform: none; } }
+
+/* ═══ STAGE ════════════════════════════════════════════════════════════════
+   #stage is the query container. In "fill" mode it is the whole window; in a
+   device preset it takes that device's exact CSS px and is transform-scaled
+   down to fit — the scale is visual only, so `cqh` still resolves to real
+   device pixels and the layout logic stays truthful.                        */
+#frame { position: fixed; inset: 0; display: grid; place-items: center; overflow: hidden; }
+#frame[data-mode="preset"] { padding: 28px; background: var(--surface-base); }
+
+#stage {
+  position: relative; overflow: hidden;
+  background: var(--surface-base);
+  container-type: size; container-name: app;
+}
+#frame[data-mode="fill"] #stage { width: 100%; height: 100%; }
+#frame[data-mode="preset"] #stage {
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.16), 0 2px 6px rgba(0,0,0,.06);
+}
+
+/* ═══ APP ROOT + FLUID SCALE ═══════════════════════════════════════════════
+   The whole no-scroll claim rests on this block. Every dimension that used to
+   be a hard px in Settings.tsx is re-expressed as clamp(floor, Ncqh, design)
+   so the design value is the CEILING, reached only when there is room for it,
+   and the floor is the smallest size that is still usable.                   */
+.app {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  color: var(--text-primary);
+
+  --pad:      clamp(12px, 2.4cqh, 24px);   /* page gutter        (was 24) */
+  --gap:      clamp(8px,  2.1cqh, 24px);   /* inter-card gap     (was 24) */
+  --cardpad:  clamp(9px,  1.9cqh, 16px);   /* card padding       (was 16) */
+  --hero-h:   clamp(64px, 23cqh, 230px);   /* bottle hero        (was 230) */
+  --thumb:    clamp(38px, 9.2cqh, 75px);   /* type thumbs        (was 75)  */
+  --swatch:   clamp(20px, 4.6cqh, 34px);   /* colour swatches    (was 34)  */
+  --clock-fs: clamp(30px, 10cqh, 80px);    /* clock numerals     (was 80)  */
+  --icon-box: clamp(56px, 12.5cqh, 100px); /* icon preview       (was 100) */
+  --msg-h:    clamp(46px, 9.5cqh, 72px);   /* message textarea   (was 72)  */
+  --card-r:   clamp(14px, 2cqh, 20px);
+
+  --fs-xs: clamp(10px, 1.35cqh, 12px);
+  --fs-sm: clamp(11px, 1.5cqh, 13px);
+  --fs-md: clamp(12px, 1.7cqh, 15px);
+  --fs-lg: clamp(14px, 1.95cqh, 17px);
+}
+
+/* ═══ SHARED PRIMITIVES ════════════════════════════════════════════════════ */
+.card {
+  background: var(--surface-primary);
+  border: .5px solid var(--border-default);
+  border-radius: var(--card-r);
+  box-shadow: var(--box-shadow-default);
+  overflow: clip;
+}
+.card-title {
+  color: var(--text-secondary);
+  font-size: var(--fs-md); font-weight: var(--font-medium);
+  letter-spacing: .01em;
+}
+.sublabel {
+  color: var(--text-muted);
+  font-size: var(--fs-md); font-weight: var(--font-medium);
+}
+.count { font-size: var(--fs-sm); font-weight: var(--font-medium); color: var(--text-muted); }
+.count[data-over="1"] { color: var(--text-error); }
+
+/* ── nav ─────────────────────────────────────────────────────────────────── */
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand img { width: 24px; height: 24px; }
+.wordmark {
+  font-weight: var(--font-medium); font-size: 14px; line-height: 18px;
+  color: transparent; background-clip: text; -webkit-background-clip: text;
+  background-image: linear-gradient(in oklab 180deg, oklab(75% -.113 -.049) 0%, oklab(53.6% -.009 -.212) 100%);
+}
+.navlink {
+  font-size: 14px; line-height: 18px; font-weight: var(--font-medium);
+  color: var(--text-tertiary); text-decoration: none;
+  transition: color 150ms ease;
+}
+.navlink:hover { color: var(--text-secondary); }
+.navlinks { display: flex; align-items: center; gap: 12px; }
+.nav {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: calc(var(--pad) * .8) var(--pad);
+}
+/* Variant 1's centred cluster: brand and links read as one object. */
+.nav-center { justify-content: center; }
+.nav-center .cluster {
+  display: flex; align-items: center; gap: 14px;
+  padding: 6px 6px 6px 10px;
+  border-radius: 999px;
+}
+.nav-center .divider { width: .5px; height: 16px; background: var(--border-strong); }
+
+/* ── the toast preview ───────────────────────────────────────────────────── */
+.toast {
+  width: 100%; max-width: 450px;
+  background: var(--surface-elevated);
+  border: .5px solid var(--border-emphasis);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--box-shadow-default);
+  padding: clamp(12px, 2.2cqh, 20px);
+  display: flex; flex-direction: column; overflow: clip;
+}
+.toast-row { display: flex; gap: clamp(14px,2.6cqh,30px); align-items: flex-start; justify-content: space-between; }
+.toast-left { display: flex; flex: 1; min-width: 0; gap: clamp(12px,2cqh,20px); align-items: flex-start; }
+.toast-bottle { position: relative; width: 24px; height: clamp(40px, 6.5cqh, 60px); flex-shrink: 0; isolation: isolate; }
+.toast-bottle img { width: 100%; height: 100%; object-fit: contain; }
+.toast-body { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: clamp(12px,2cqh,20px); }
+.toast-head { display: flex; flex-direction: column; gap: 2px; }
+.toast-titlerow { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.toast-title {
+  min-width: 0; color: var(--text-primary); font-size: var(--fs-lg);
+  font-weight: var(--font-semibold); line-height: var(--leading-tight);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.toast-logo { flex-shrink: 0; display: flex; }
+.toast-logo img { width: 16px; height: 16px; border-radius: 4px; object-fit: contain; }
+.toast-msg { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); font-weight: var(--font-medium); line-height: 1.25; }
+.toast-cta { color: var(--text-brand); font-size: var(--fs-sm); font-weight: var(--font-medium); }
+.toast-x { flex-shrink: 0; color: var(--text-muted); padding: 4px; line-height: 0; }
+
+.sip-bottle-shimmer { animation: sip-shimmer-hue var(--shimmer-hue-duration) var(--shimmer-ease) infinite; }
+.sip-bottle-shimmer-overlay {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,.6) 0%, transparent 50%, rgba(255,255,255,.4) 100%);
+  mix-blend-mode: overlay;
+  mask-size: contain; mask-repeat: no-repeat; mask-position: center;
+  -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center;
+  animation: sip-shimmer-overlay var(--shimmer-overlay-duration) var(--shimmer-ease) infinite;
+}
+@keyframes sip-shimmer-hue { 0%,100% { filter: hue-rotate(var(--shimmer-hue-min)); } 50% { filter: hue-rotate(var(--shimmer-hue-max)); } }
+@keyframes sip-shimmer-overlay { 0%,100% { opacity: var(--shimmer-overlay-opacity-min); } 50% { opacity: var(--shimmer-overlay-opacity-max); } }
+@media (prefers-reduced-motion: reduce) { .sip-bottle-shimmer, .sip-bottle-shimmer-overlay { animation: none; } }
+
+.pill {
+  background: var(--surface-elevated);
+  border: .5px solid var(--border-emphasis);
+  border-radius: 999px;
+  box-shadow: var(--box-shadow-subtle);
+  padding: 5px 16px;
+  font-size: var(--fs-sm); font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  transition: color 150ms ease, background-color 150ms ease;
+}
+.pill:hover { background: color-mix(in srgb, var(--surface-elevated) 92%, var(--text-primary)); color: var(--text-primary); }
+
+/* ── preview blocks ──────────────────────────────────────────────────────── */
+.preview-card {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center;
+  gap: clamp(10px, 2.2cqh, 22px);
+  padding: clamp(14px, 3cqh, 30px) var(--cardpad) clamp(12px, 2.2cqh, 20px);
+}
+
+/* ── section content (shared by all five variants) ───────────────────────── */
+/* flex: 0 1 auto — the section is content-height and may shrink, but never
+   grows. Growing was the mistake: it made each section stretch to fill its
+   panel, which both inflated the bottle and pulled the controls away from the
+   title labelling them. The surplus is now handled one level up, by centring
+   the head+section group inside .panel, so the two stay together. */
+.sec {
+  flex: 0 1 auto; min-height: 0;
+  display: flex; flex-direction: column;
+  gap: var(--gap);
+  /* Measure cap. Every control row is justify-content:space-between, so
+     without it the three type thumbs and six swatches fling to opposite ends
+     of however wide the card happens to be — 1200px in the rail variant. 480
+     is derived, not picked: the bottle card in the shipped bento is ~450 wide
+     with ~418 of inner width, and these rows already read correctly there.
+     Left-aligned, not centred, so the row shares its card's left edge with the
+     section title above it. */
+  width: 100%; max-width: 480px;
+}
+/* flex:0 0 auto, not the default 0 1 auto — the controls must hold their own
+   height and let the hero be the single elastic element. Left shrinkable, the
+   swatch and thumb rows were the first things to get squeezed below their
+   content on a short screen, which is exactly backwards. */
+.field { flex: 0 0 auto; display: flex; flex-direction: column; gap: clamp(6px, 1.2cqh, 12px); }
+.field-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
+.row-spread { display: flex; justify-content: space-between; gap: 6px; }
+
+.hero {
+  /* 0 1 basis, not 1 1: the hero shrinks when the container is tight but never
+     grows past the design's 230px. With a grow factor it inflated to ~700px in
+     a tall panel — three times its design size, dwarfing the toast it is meant
+     to sit beneath. It is still the first thing to give: it is the only
+     shrinkable box in the section (.field is rigid). The 56px floor makes a
+     genuinely impossible container fail visibly on the fit badge rather than
+     silently collapsing the bottle to a line. */
+  flex: 0 1 var(--hero-h); min-height: 56px;
+  background: var(--surface-base);
+  border: .5px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--box-shadow-subtle);
+  display: flex; align-items: center; justify-content: center;
+  overflow: clip;
+}
+.hero img { height: 86%; width: auto; max-width: 90%; object-fit: contain; }
+
+.thumb {
+  position: relative; overflow: clip;
+  width: var(--thumb); height: var(--thumb);
+  border-radius: var(--radius-md);
+  border: .5px solid var(--border-default);
+  background: var(--surface-base);
+  box-shadow: var(--box-shadow-subtle);
+  display: flex; align-items: center; justify-content: center;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.thumb[aria-pressed="true"] { background: var(--state-selected); border-color: var(--border-emphasis); }
+.thumb img { height: 66%; width: auto; object-fit: contain; }
+
+.swatch {
+  width: var(--swatch); height: var(--swatch);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--box-shadow-subtle);
+  overflow: clip;
+  transition: outline-color 120ms ease;
+}
+.swatch[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 1px; }
+
+.input, .textarea {
+  width: 100%;
+  background: var(--surface-raised);
+  border: .5px solid var(--border-emphasis);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--box-shadow-subtle);
+  padding: clamp(6px, 1.2cqh, 8px);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color 150ms ease;
+}
+.input { font-size: var(--fs-lg); font-weight: var(--font-semibold); }
+.textarea { font-size: var(--fs-lg); font-weight: var(--font-medium); height: var(--msg-h); resize: none; }
+/* 1px focus stroke assembled from a .5px border + .5px outline (see the
+   input-focus-stroke-technique note) so it never shifts layout. */
+.input:hover, .textarea:hover { border-color: var(--border-focus); }
+.input:focus, .textarea:focus {
+  border-color: var(--border-focus);
+  outline: .5px solid var(--border-focus); outline-offset: 0;
+}
+
+.clockwrap { position: relative; flex: 0 0 auto; }
+.clock {
+  width: 100%; text-align: center;
+  background: var(--surface-raised);
+  border: .5px solid var(--border-emphasis);
+  border-radius: var(--radius-xl);
+  padding: clamp(4px, .8cqh, 8px);
+  font-family: var(--font-sans);
+  font-size: var(--clock-fs); font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  color: transparent; caret-color: var(--text-primary);
+  outline: none; transition: border-color 150ms ease;
+}
+.clock:hover { border-color: var(--border-focus); }
+.clock:focus { border-color: var(--border-focus); outline: .5px solid var(--border-focus); outline-offset: 0; }
+.clock-mirror {
+  position: absolute; inset: 0; pointer-events: none; user-select: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--clock-fs); font-weight: var(--font-semibold);
+  line-height: var(--leading-tight); color: var(--text-primary);
+}
+.clock-mirror .colon { color: var(--text-tertiary); transform: translateY(-.08em); }
+.every { display: flex; align-items: center; gap: 6px; padding: 4px 8px; }
+.every-label { color: var(--text-muted); font-size: var(--fs-lg); font-weight: var(--font-medium); flex-shrink: 0; }
+.every-value { color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--font-medium); font-variant-numeric: tabular-nums; }
+
+.iconbox {
+  width: var(--icon-box); height: var(--icon-box);
+  border: .5px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--box-shadow-subtle);
+  background: var(--surface-base);
+  display: flex; align-items: center; justify-content: center;
+  overflow: clip; flex-shrink: 0;
+}
+.iconbox img { width: 63%; height: 63%; object-fit: contain; }
+.linkbtn {
+  font-size: var(--fs-sm); font-weight: var(--font-medium);
+  color: var(--text-tertiary); transition: color 150ms ease;
+}
+.linkbtn:hover { color: var(--text-primary); }
+.checkrow { display: flex; align-items: center; gap: 8px; user-select: none; cursor: pointer; }
+.checkbox {
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: .5px solid var(--border-emphasis);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--box-shadow-subtle);
+  background: var(--surface-elevated);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-primary);
+  transition: transform 350ms cubic-bezier(.34,1.56,.64,1);
+}
+.checkrow:active .checkbox { transform: scale(.94); transition-duration: 100ms; }
+.checklabel { font-size: var(--fs-sm); font-weight: var(--font-medium); color: var(--text-secondary); }
+
+/* Appearance as a 3-up segmented row — reads well in a wide tab panel and in
+   a narrow phone panel, unlike the original stacked list. */
+.theme-row { display: flex; gap: 4px; }
+.theme-btn {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: clamp(6px, 1.2cqh, 10px) 6px;
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  font-size: var(--fs-sm); font-weight: var(--font-medium);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.theme-btn:hover { background: var(--state-hover); color: var(--text-secondary); }
+.theme-btn[aria-pressed="true"] { background: var(--state-selected); color: var(--text-secondary); }
+.theme-btn svg { flex-shrink: 0; }
+
+/* ── tab chrome, shared by the tabbed variants ───────────────────────────── */
+.segbar {
+  flex: 0 0 auto;
+  display: flex; gap: 2px;
+  padding: 3px;
+  background: var(--surface-primary);
+  border: .5px solid var(--border-default);
+  border-radius: 999px;
+  box-shadow: var(--box-shadow-subtle);
+}
+.segbar button {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: clamp(5px, 1cqh, 9px) 4px;
+  border-radius: 999px;
+  /* Transparent border on every state, not just the selected one — otherwise
+     the selected pill is 1px taller than its neighbours and the row jitters
+     as the selection moves. */
+  border: .5px solid transparent;
+  color: var(--text-tertiary);
+  font-size: var(--fs-sm); font-weight: var(--font-medium);
+  white-space: nowrap;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+.segbar button:hover { color: var(--text-secondary); }
+.segbar button[aria-selected="true"] {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--box-shadow-subtle);
+  border-color: var(--border-default);
+}
+/* Below ~430px of container the labels would ellipsis — drop to icons only. */
+@container app (max-width: 430px) { .segbar button .lbl { display: none; } }
+
+.panel {
+  flex: 1 1 auto; min-height: 0;
+  padding: var(--cardpad);
+  /* The surplus lands here, split above and below the head+section group, so
+     the section title never floats hundreds of px above the controls it names.
+     This is what makes one-section-per-view read as composed rather than
+     top-anchored-with-a-lake-of-empty-underneath. */
+  display: flex; flex-direction: column; justify-content: center;
+}
+.panel-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 4px clamp(6px, 1.4cqh, 12px);
+}
+
+/* Panel swap: the content fades/slides in so switching views reads as a
+   change of view, not a repaint. 120ms — below the 150ms "instant" threshold,
+   so it costs nothing perceptually. */
+@media (prefers-reduced-motion: no-preference) {
+  .panel-anim { animation: panel-in 160ms cubic-bezier(.22,.61,.36,1) both; }
+}
+@keyframes panel-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT 1 — SEGMENTED
+   Preview on top, centred segmented control, one panel. The most literal
+   reading of "every card is a tab". Centred nav cluster.
+   ═════════════════════════════════════════════════════════════════════════ */
+.v1 { height: 100%; display: flex; flex-direction: column; }
+.v1-col {
+  flex: 1 1 auto; min-height: 0;
+  width: 100%; max-width: 560px; margin: 0 auto;
+  padding: 0 var(--pad) var(--pad);
+  display: flex; flex-direction: column; gap: var(--gap);
+}
+.v1 .panel-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT 2 — RAIL / TAB BAR
+   Vertical rail ≥820, bottom tab bar below. The native-app reading: nav is
+   persistent chrome pinned to an edge, content owns the middle.
+   ═════════════════════════════════════════════════════════════════════════ */
+.v2 { height: 100%; display: flex; flex-direction: column; }
+.v2-body { flex: 1 1 auto; min-height: 0; display: flex; }
+
+.rail {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--pad);
+  width: 176px;
+}
+.rail-top { flex: 0 0 auto; padding: 0 8px clamp(12px, 2.4cqh, 22px); }
+.rail button {
+  display: flex; align-items: center; gap: 10px;
+  padding: clamp(6px,1.2cqh,10px) 10px;
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  font-size: var(--fs-md); font-weight: var(--font-medium);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.rail button:hover { background: var(--state-hover); color: var(--text-secondary); }
+.rail button[aria-selected="true"] { background: var(--state-selected); color: var(--text-primary); }
+.rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding: 12px 10px 0; }
+
+.v2-main {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--gap);
+  padding: var(--pad) var(--pad) var(--pad) 0;
+  /* Same 560 column as the segmented variant, centred in the space the rail
+     leaves. Uncapped it ran the full 1200px, which made the cards read as
+     empty banners and stranded every control row's right-hand end. */
+  width: 100%; max-width: 560px; margin-inline: auto;
+}
+.v2 .panel-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.v2 .topbar { display: none; }
+.v2 .tabbar { display: none; }
+
+/* Bottom tab bar below 820 — thumb-reachable, and it frees the vertical
+   space the rail's labels were eating. */
+@container app (max-width: 819px) {
+  .v2 .rail { display: none; }
+  .v2 .topbar { display: flex; align-items: center; justify-content: space-between; padding: calc(var(--pad)*.8) var(--pad); }
+  .v2-main { padding: 0 var(--pad) var(--gap); }
+  .v2 .tabbar {
+    flex: 0 0 auto; display: flex; gap: 2px;
+    padding: 6px var(--pad) max(6px, env(safe-area-inset-bottom));
+    border-top: .5px solid var(--border-default);
+    background: var(--surface-primary);
+  }
+  .v2 .tabbar button {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 2px; border-radius: var(--radius-md);
+    color: var(--text-tertiary); font-size: var(--fs-xs); font-weight: var(--font-medium);
+    transition: color 150ms ease;
+  }
+  .v2 .tabbar button[aria-selected="true"] { color: var(--text-primary); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT 3 — INSPECTOR SPLIT
+   The preview is a permanent canvas, not a card; settings are an inspector
+   docked beside it. Closest to a design tool, and the preview never moves.
+   ═════════════════════════════════════════════════════════════════════════ */
+.v3 { height: 100%; display: flex; flex-direction: column; }
+.v3-body {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; gap: var(--gap);
+  padding: 0 var(--pad) var(--pad);
+}
+/* The canvas is a stand-in for the user's screen, so the toast sits where it
+   really lands — pinned top-right — instead of floating in the middle. That is
+   the whole justification for giving this variant so much empty space: the
+   emptiness is the screen, and the position is information. */
+.v3-canvas {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+  gap: clamp(12px, 2.4cqh, 24px);
+  border-radius: var(--card-r);
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text-muted) 42%, transparent) 1px, transparent 0)
+    0 0 / 16px 16px;
+  border: .5px dashed var(--border-default);
+  padding: var(--cardpad);
+}
+.canvas-toast { display: flex; justify-content: flex-end; flex: 0 1 auto; min-height: 0; }
+.canvas-foot { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: clamp(8px, 1.6cqh, 14px); }
+.canvas-note { font-size: var(--fs-sm); font-weight: var(--font-medium); color: var(--text-muted); text-align: center; }
+.v3-inspector {
+  flex: 0 0 420px; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.v3-tabs { flex: 0 0 auto; display: flex; gap: 2px; padding: 6px; border-bottom: .5px solid var(--border-default); }
+.v3-tabs button {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: clamp(6px,1.2cqh,9px) 4px; border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.v3-tabs button:hover { background: var(--state-hover); color: var(--text-secondary); }
+.v3-tabs button[aria-selected="true"] { background: var(--state-selected); color: var(--text-primary); }
+/* The one variant that does NOT centre. An inspector column is read top-down
+   from its tab strip, so its content belongs at the top; dead space at the
+   bottom of an inspector is the expected shape. */
+.v3-inspector .panel { justify-content: flex-start; }
+
+@container app (max-width: 899px) {
+  .v3-body { flex-direction: column; }
+  /* Stacked, the canvas is a strip rather than a screen — there is no room
+     left for the corner to read as a corner, so the toast recentres and the
+     caption goes (it would be claiming something the strip can't show). */
+  .v3-canvas { flex: 0 0 auto; padding: clamp(10px,2cqh,18px); gap: clamp(8px,1.6cqh,14px); }
+  .canvas-toast { justify-content: center; }
+  .canvas-note { display: none; }
+  .v3-inspector { flex: 1 1 auto; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT 4 — CONTROL DOCK
+   The preview is the whole screen; controls are summoned. Tapping the active
+   dock item dismisses the sheet, giving a zero-chrome preview state.
+   ═════════════════════════════════════════════════════════════════════════ */
+.v4 { height: 100%; display: flex; flex-direction: column; position: relative; }
+.v4-stage {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: clamp(12px, 2.6cqh, 26px);
+  padding: 0 var(--pad);
+  transition: flex-basis 260ms cubic-bezier(.22,.61,.36,1);
+}
+.v4-sheet {
+  flex: 0 1 auto; min-height: 0;
+  width: 100%; max-width: 560px; margin: 0 auto;
+  padding: 0 var(--pad);
+  display: flex; flex-direction: column;
+  max-height: 58cqh;
+}
+.v4-sheet[hidden] { display: none; }
+.v4-sheet .card { display: flex; flex-direction: column; min-height: 0; }
+
+/* Short containers: the dock's hero-preview idea inverts. There is no surplus
+   to give the preview, so the sheet takes priority and the toast sits at its
+   natural height on top. Without this the stage clips on a 568px-tall phone —
+   the one place where "preview as hero" and "never scroll" actually conflict. */
+@container app (max-height: 660px) {
+  /* 0 0 auto, not 0 1 auto: the toast is already at its smallest here, so
+     letting it shrink only shaves a couple of px off the preview and clips it.
+     The sheet is the elastic one — it has a scrollable-free panel that
+     genuinely can give. */
+  .v4-stage { flex: 0 0 auto; }
+  .v4-sheet { flex: 1 1 auto; max-height: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .v4-sheet .card { animation: sheet-up 240ms cubic-bezier(.22,.61,.36,1) both; }
+}
+@keyframes sheet-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.dock-wrap { flex: 0 0 auto; display: flex; justify-content: center; padding: var(--gap) var(--pad) max(var(--pad), env(safe-area-inset-bottom)); }
+.dock {
+  display: flex; gap: 2px; padding: 5px;
+  background: color-mix(in srgb, var(--surface-primary) 88%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: .5px solid var(--border-default);
+  border-radius: 999px;
+  box-shadow: var(--box-shadow-strong);
+}
+.dock button {
+  display: flex; align-items: center; gap: 7px;
+  padding: clamp(7px,1.3cqh,10px) clamp(10px,1.8cqh,14px);
+  border-radius: 999px;
+  color: var(--text-tertiary);
+  font-size: var(--fs-sm); font-weight: var(--font-medium);
+  white-space: nowrap;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+.dock button:hover { background: var(--state-hover); color: var(--text-secondary); }
+.dock button[aria-selected="true"] { background: var(--state-selected); color: var(--text-primary); }
+@container app (max-width: 560px) {
+  .dock button .lbl { display: none; }
+  .dock button { padding: 10px 12px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT 5 — ADAPTIVE
+   Tabs are a response to scarcity, not a fixed decision. When the container
+   can hold all five sections at once it shows them all (a *fitted* bento);
+   when it cannot, it collapses to preview + tabs. Mode is chosen in JS from
+   a ResizeObserver so only one copy of each section is ever in the DOM.
+   ═════════════════════════════════════════════════════════════════════════ */
+.v5 { height: 100%; display: flex; flex-direction: column; }
+.v5-body {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; gap: var(--gap); justify-content: center;
+  padding: 0 var(--pad) var(--pad);
+}
+.v5-left { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--gap); width: 420px; }
+.v5-grid {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: grid; gap: var(--gap);
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  grid-template-rows: 1fr auto auto;
+  /* Keeps each column near the 480 the sections are built for on a 1920
+     display; below ~1500 the grid is narrower than this anyway and the cap
+     never engages. The body centres what is left. */
+  max-width: 1040px;
+}
+.v5-grid .card { padding: var(--cardpad); display: flex; flex-direction: column; min-height: 0; }
+/* Explicit placement — auto-placement would push Appearance onto a 4th row
+   and leave Bottle spanning only two of them. */
+.v5-grid .cell-bottle     { grid-column: 1; grid-row: 1 / -1; }
+.v5-grid .cell-time       { grid-column: 2; grid-row: 1; }
+.v5-grid .cell-icon       { grid-column: 2; grid-row: 2; }
+.v5-grid .cell-appearance { grid-column: 2; grid-row: 3; }
+/* Roomy mode is content-sized cards, vertically centred as a cluster — the
+   alternative (stretch rows) leaves ~300px of dead space inside the Bottle and
+   Time cards, which is precisely the bento problem this study is trying to
+   leave behind. Centring the cluster puts that surplus in the margins instead. */
+.v5-body:not(.v5-compact) .v5-grid { grid-template-rows: auto auto auto; align-content: center; }
+.v5-body:not(.v5-compact) .v5-left { justify-content: center; }
+.v5-compact { flex-direction: column; }
+.v5-compact .v5-left { width: 100%; }
+.v5 .panel-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT 6 — EDITOR (controls left, stage right)
+   The asciinator reading, and the one that takes the product seriously as an
+   editor rather than an app-with-settings. Three decisions carry it:
+
+   1. CONTROLS LEFT, STAGE RIGHT — not arbitrary. The toast only ever arrives
+      centre or right of a real screen, so putting the stage on the right means
+      the preview sits on the same side of the layout that the real thing sits
+      on. A test toast also animates over empty canvas instead of over a dense
+      column of controls, which is what made the dock variant's Test button
+      feel wrong.
+   2. THE PREVIEW *IS* THE TEST. One toast, not two. It lives at its configured
+      position in the stage permanently; Test replays its entrance in place.
+      That deletes the separate live-toast layer entirely.
+   3. ONE CARD, HAIRLINE SECTIONS — not six stacked cards. Six sections need
+      six headings; giving each one its own card as well means twelve pieces of
+      chrome for six groups of controls.
+
+   DOM order is [stage, controls] and the desktop row is `row-reverse`, so the
+   single property that flips is flex-direction: row-reverse → column. That is
+   what puts the stage on the RIGHT on desktop and on TOP on mobile, with no
+   duplicated markup and no `order` juggling.
+   ═════════════════════════════════════════════════════════════════════════ */
+.v6 { height: 100%; display: flex; flex-direction: column; }
+.v6-body {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: row-reverse;
+  gap: var(--gap);
+  padding: 0 var(--pad) var(--pad);
+}
+
+/* ── stage: stands in for the screen the toast lands on ──────────────────── */
+/* The wrap exists only to keep the Test strip glued under the stage. It has to
+   be a real class, not an inline style, so the stacked rules below can flip it
+   from "take the leftover space" to "content height". */
+.v6-stage-wrap {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.v6-stage {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  position: relative; overflow: clip;
+  border-radius: var(--card-r);
+  border: .5px solid var(--border-default);
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text-muted) 38%, transparent) 1px, transparent 0)
+    0 0 / 16px 16px;
+}
+/* inset matches the real Toaster's offset="16px" so the preview sits exactly
+   where the shipped toast sits relative to the viewport edge. */
+.toast-slot { position: absolute; inset: clamp(10px, 1.8cqh, 16px); display: flex; }
+.v6-stage .toast { width: min(450px, 100%); flex: 0 0 auto; }
+
+.v6-stage[data-pos^="top"]     .toast-slot { align-items: flex-start; }
+.v6-stage[data-pos^="bottom"]  .toast-slot { align-items: flex-end; }
+.v6-stage[data-pos$="left"]    .toast-slot { justify-content: flex-start; }
+.v6-stage[data-pos$="center"]  .toast-slot { justify-content: center; }
+.v6-stage[data-pos$="right"]   .toast-slot { justify-content: flex-end; }
+
+/* Direction follows the position — a bottom-anchored toast leaving downward and
+   rising back from below is the tell that the stage understands where it is.
+   Both halves use the shipped durations and curves, so Test is a faithful
+   playback rather than an approximation of one. */
+@media (prefers-reduced-motion: no-preference) {
+  .v6-stage[data-pos^="top"]    .toast.leaving { animation: stage-out-top    var(--sip-exit-duration)  var(--sip-ease-out) both; }
+  .v6-stage[data-pos^="bottom"] .toast.leaving { animation: stage-out-bottom var(--sip-exit-duration)  var(--sip-ease-out) both; }
+  .v6-stage[data-pos^="top"]    .toast.replay  { animation: stage-in-top     var(--sip-enter-duration) var(--sip-ease-in)  both; }
+  .v6-stage[data-pos^="bottom"] .toast.replay  { animation: stage-in-bottom  var(--sip-enter-duration) var(--sip-ease-in)  both; }
+}
+@keyframes stage-in-top     { from { opacity: 0; transform: translateY(-100%) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes stage-in-bottom  { from { opacity: 0; transform: translateY(100%)  scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes stage-out-top    { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-100%) scale(.98); } }
+@keyframes stage-out-bottom { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(100%)  scale(.98); } }
+
+/* Reduced motion: no animation at all, not a "gentler" one — opacity fades are
+   still motion to a vestibular system. Which leaves Test with nothing to do,
+   since demonstrating motion is its ONLY job (the toast is already on screen,
+   permanently, at the right position). So it is hidden rather than turned into
+   a button that appears broken. The strip was built to stay balanced without
+   it, so this degrades cleanly. */
+@media (prefers-reduced-motion: reduce) {
+  .v6-stage .toast.leaving,
+  .v6-stage .toast.replay { animation: none; }
+  .v6-strip .testbtn { display: none; }
+}
+
+/* The strip under the stage. Carrying a label as well as the button is what
+   stops the button reading as a stray word floating under a box — and it means
+   toggling Test off leaves a balanced strip rather than an empty gap. */
+.v6-strip {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: clamp(6px, 1.2cqh, 10px) 2px 0;
+}
+.v6-strip-label {
+  font-size: var(--fs-xs); font-weight: var(--font-medium);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.testbtn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px;
+  border: .5px solid var(--border-default);
+  color: var(--text-tertiary);
+  font-size: var(--fs-sm); font-weight: var(--font-medium);
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.testbtn[hidden] { display: none; }
+.testbtn:hover { background: var(--state-hover); color: var(--text-primary); border-color: var(--border-emphasis); }
+
+/* ── controls: the one place scrolling is permitted ─────────────────────── */
+.v6-controls {
+  position: relative;
+  flex: 0 0 clamp(316px, 30cqw, 400px); min-height: 0;
+  display: flex; flex-direction: column;
+}
+/* Scroll affordance, and not a decorative one: Timing and Position live below
+   the fold on every viewport, so without a cue that the column continues, two
+   of the six settings are simply undiscoverable. Driven by an actual
+   scroll-position check so it disappears once you reach the end, rather than
+   permanently shading the last section. */
+.v6-controls::after {
+  content: ''; position: absolute; left: .5px; right: .5px; bottom: .5px; height: 44px;
+  border-radius: 0 0 var(--card-r) var(--card-r);
+  background: linear-gradient(to bottom, transparent, var(--surface-primary));
+  pointer-events: none; opacity: 0; transition: opacity 180ms ease;
+}
+.v6-controls[data-more="1"]::after { opacity: 1; }
+.v6-panel {
+  flex: 1 1 auto; min-height: 0;
+  /* The card itself scrolls, so its border and radius stay pinned while the
+     content moves inside it — the stage opposite never moves at all. */
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.v6-panel::-webkit-scrollbar { width: 10px; }
+.v6-panel::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  border-radius: 999px; border: 3px solid transparent; background-clip: content-box;
+}
+.v6-panel::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text-muted) 75%, transparent); background-clip: content-box; }
+
+.v6-sec {
+  padding: var(--cardpad);
+  display: flex; flex-direction: column; gap: clamp(8px, 1.5cqh, 14px);
+}
+.v6-sec + .v6-sec { border-top: .5px solid var(--border-default); }
+.v6-sec-title {
+  color: var(--text-secondary);
+  font-size: var(--fs-md); font-weight: var(--font-semibold);
+  padding-left: 4px;
+}
+/* Sections here are content-height and full-width: the column scrolls, so
+   there is no surplus to centre and no wide card to cap against. */
+.v6-sec .sec { max-width: none; }
+
+/* ── position picker (exploratory — see CONTENT.position) ───────────────── */
+.pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pos-btn {
+  position: relative; aspect-ratio: 16 / 10;
+  border-radius: var(--radius-xs);
+  border: .5px solid var(--border-default);
+  background: var(--surface-base);
+  box-shadow: var(--box-shadow-subtle);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.pos-btn:hover { background: var(--state-hover); }
+.pos-btn[aria-pressed="true"] { background: var(--state-selected); border-color: var(--border-emphasis); }
+.pos-btn i {
+  position: absolute; display: block;
+  width: 40%; height: 22%; border-radius: 2px;
+  background: var(--text-muted);
+  transition: background-color 150ms ease;
+}
+.pos-btn[aria-pressed="true"] i { background: var(--text-primary); }
+.pos-btn[data-pos^="top"]    i { top: 14%; }
+.pos-btn[data-pos^="bottom"] i { bottom: 14%; }
+.pos-btn[data-pos$="left"]   i { left: 12%; }
+.pos-btn[data-pos$="right"]  i { right: 12%; }
+.pos-btn[data-pos$="center"] i { left: 50%; transform: translateX(-50%); }
+
+/* ── stacked ─────────────────────────────────────────────────────────────
+   The stage becomes a rigid row at the top and the controls take the rest.
+   No position:sticky needed: the whole app is already a fixed-height flex
+   tree, so a `flex: 0 0` row simply cannot be scrolled away. The preview is
+   pinned for free — which is the thing asciinator gets wrong on mobile.
+   Below here the stage is too short for corner-vs-corner to read as position,
+   so it degrades honestly to "the toast, at real size, always visible." */
+@container app (max-width: 860px) {
+  .v6-body { flex-direction: column; }
+  .v6-stage-wrap { flex: 0 0 auto; }
+  .v6-stage { flex: 0 0 clamp(116px, 25cqh, 200px); }
+  .v6-controls { flex: 1 1 auto; width: 100%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANT 7 — THE DESIGN (Paper exports, Aug 24 — light + dark)
+   Sizes and spacing come from the light export; colours for dark come from the
+   dark export. Where the two disagree (they do, in three places) the split is
+   resolved that way deliberately — see the handoff notes.
+
+   THE SURFACE SYSTEM. Light: white page, #F8F8F9 cards RECESSED into it,
+   controls returning to white. Dark: near-black page, cards one step LIGHTER
+   (raised — "recessed" against near-black reads as a hole), controls back down
+   to page level. Same relationship, opposite direction.
+
+   BUT NOT UNIFORMLY — and this is the one thing that needs a decision before
+   these become real tokens. In light, text inputs and the clock box are the
+   SAME surface (white). In dark the spec pulls them apart: the clock box and
+   the theme track sit at page level (#171719) while text inputs sit a step
+   lighter (#28282C). So a single "input background" token cannot express both
+   themes. Hence two families below — `well` and `input` — which are identical
+   in light and diverge in dark.
+   ═════════════════════════════════════════════════════════════════════════ */
+.v7 {
+  --v7-page:          #FFFFFF;
+  --v7-card:          #F8F8F9;   /* neutral-25 — the one value not in tokens.css */
+
+  /* well = clock box, theme track, unselected type chip */
+  --v7-well:          #FFFFFF;
+  --v7-well-border:   #F1F1F2;   /* neutral-50  */
+  /* input = title + message fields. Same as well in light; NOT in dark. */
+  --v7-input:         #FFFFFF;
+  --v7-input-border:  #F1F1F2;   /* neutral-50  */
+  /* raised = selected type chip, selected theme segment */
+  --v7-raised:        #F1F1F2;   /* neutral-50  */
+  --v7-raised-border: #EAEAEC;   /* neutral-75  */
+
+  --v7-test:          #EAEAEC;   /* neutral-75 — borderless as of this pass */
+  --v7-test-text:     #171719;   /* neutral-997 */
+  --v7-strong:        #171719;   /* neutral-997 — field values, clock digits */
+  --v7-label:         #5A5C65;   /* neutral-600 — field labels */
+
+  --v7-modal:         #FBFBFB;   /* neutral-03  */
+  --v7-modal-border:  #E3E3E5;   /* neutral-100 */
+  --v7-scrim:         rgba(23,23,25,.28);
+}
+[data-theme="dark"] .v7 {
+  --v7-page:          #171719;   /* neutral-997 */
+  --v7-card:          #1F2023;   /* neutral-925 */
+
+  --v7-well:          #171719;   /* neutral-997 — back to page level */
+  --v7-well-border:   #252529;   /* neutral-875 */
+  --v7-input:         #28282C;   /* neutral-850 — a step LIGHTER, unlike light */
+  --v7-input-border:  #323338;   /* neutral-800 */
+  --v7-raised:        #28282C;   /* neutral-850 */
+  --v7-raised-border: #323338;   /* neutral-800 */
+
+  --v7-test:          #28282C;   /* neutral-850 */
+  --v7-test-text:     #FFFFFF;
+  --v7-strong:        #FFFFFF;
+  --v7-label:         #C6C7CC;   /* neutral-200 */
+
+  --v7-modal:         #1C1D20;   /* neutral-950 — not in the export; derived */
+  --v7-modal-border:  #323338;   /* neutral-800 */
+  --v7-scrim:         rgba(0,0,0,.55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .v7 {
+    --v7-page: #171719; --v7-card: #1F2023;
+    --v7-well: #171719; --v7-well-border: #252529;
+    --v7-input: #28282C; --v7-input-border: #323338;
+    --v7-raised: #28282C; --v7-raised-border: #323338;
+    --v7-test: #28282C; --v7-test-text: #FFFFFF;
+    --v7-strong: #FFFFFF; --v7-label: #C6C7CC;
+    --v7-modal: #1C1D20; --v7-modal-border: #323338; --v7-scrim: rgba(0,0,0,.55);
+  }
+}
+
+.v7 {
+  height: 100%; display: flex; flex-direction: column;
+  background: var(--v7-page);
+  /* Paper's default Tailwind scale, which is NOT the repo's remapped one —
+     24 / 18 / 32 are all new values needing tokens. */
+  --r-card: 24px; --r-chip: 18px; --r-field: 12px; --r-modal: 32px;
+}
+
+/* The toast needs NO v7 override: --surface-elevated / --border-emphasis
+   already resolve to #FFFFFF/#D4D5D8 in light and #323338/#44454C in dark,
+   which is exactly what both exports specify. The existing toast tokens were
+   already right. */
+
+/* ── nav ─────────────────────────────────────────────────────────────────── */
+.v7-nav {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 16px 32px;
+}
+.v7-brand { display: flex; align-items: center; gap: 8px; }
+.v7-brand svg { width: 24px; height: 24px; display: block; flex-shrink: 0; }
+.v7-wordmark {
+  font-size: 16px; line-height: 1.25; font-weight: var(--font-semibold);
+  letter-spacing: -.03em;
+  color: transparent; background-clip: text; -webkit-background-clip: text;
+  background-image: linear-gradient(in oklab 180deg, oklab(75% -.113 -.049) 0%, oklab(53.6% -.009 -.212) 100%);
+}
+.v7-navlinks { display: flex; align-items: center; gap: 16px; }
+.v7-navlink {
+  font-size: 16px; line-height: 1.25; font-weight: var(--font-semibold);
+  letter-spacing: -.03em; color: var(--text-muted);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+.v7-navlink:hover { color: var(--text-tertiary); }
+
+/* ── body ────────────────────────────────────────────────────────────────── */
+.v7-body {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: row-reverse;
+  gap: 8px; padding: 0 16px 16px;
+}
+
+/* ── preview: the elastic half ───────────────────────────────────────────── */
+.v7-preview {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; border-radius: var(--r-card);
+  background: var(--v7-card);
+  overflow: clip; overflow-clip-margin: 12px;
+}
+.v7-preview-inner {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; width: 100%; min-height: 0;
+}
+.v7 .toast { width: min(450px, 100%); flex: 0 0 auto; }
+
+.v7-test {
+  width: min(450px, 100%);
+  padding: 12px; border-radius: var(--r-card);
+  background: var(--v7-test);
+  color: var(--v7-test-text);
+  /* Borderless as of this pass. Weight is SEMIBOLD, following the dark export
+     — the light export still calls for ABC Diatype Rounded Bold, a trial font
+     that is not in the repo and that the dark export has already dropped. */
+  font-size: 20px; line-height: 1.2; font-weight: var(--font-semibold);
+  letter-spacing: -.03em; text-align: center;
+  transition: background-color 150ms ease, filter 150ms ease;
+}
+.v7-test:hover { filter: brightness(.97); }
+[data-theme="dark"] .v7-test:hover { filter: brightness(1.25); }
+.v7-test[hidden] { display: none; }
+
+/* ── controls: rigid 290px ───────────────────────────────────────────────── */
+.v7-controls {
+  flex: 0 0 290px; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.v7-scroller {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 8px;
+  /* Scrollbar hidden, not scrolling disabled. The gutter was shifting the
+     cards out of alignment with the nav; hiding the bar fixes that without
+     making the last card unreachable on a short viewport. NOTE: with the fade
+     removed too, there is now no affordance at all that the column continues
+     — flagged in the handoff. */
+  scrollbar-width: none;
+}
+.v7-scroller::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+.v7-card {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 16px; border-radius: var(--r-card);
+  background: var(--v7-card);
+}
+.v7-card-title {
+  font-size: 13px; line-height: 1.25; font-weight: var(--font-semibold);
+  text-transform: uppercase; letter-spacing: .02em;
+  color: var(--text-muted);
+}
+.v7-fields { display: flex; flex-direction: column; gap: 16px; }
+.v7-field { display: flex; flex-direction: column; gap: 4px; }
+.v7-field-head { display: flex; align-items: center; justify-content: space-between; }
+.v7-label {
+  font-size: 15px; line-height: 1.2; font-weight: var(--font-semibold);
+  color: var(--v7-label);
+}
+.v7-count { font-size: 15px; line-height: 1.2; font-weight: var(--font-medium); color: var(--text-muted); }
+.v7-count[data-over="1"] { color: var(--text-error); }
+
+/* ── inputs ──────────────────────────────────────────────────────────────── */
+.v7-input, .v7-textarea {
+  width: 100%; padding: 8px;
+  border-radius: var(--r-field);
+  background: var(--v7-input);
+  border: 1px solid var(--v7-input-border);
+  color: var(--v7-strong);
+  font-family: var(--font-sans); font-size: 15px; line-height: 1.25;
+  font-weight: var(--font-semibold);
+  outline: none;
+  transition: border-color 150ms ease;
+}
+.v7-textarea { height: 72px; resize: none; }
+/* 1px focus stroke assembled from a .5px border + .5px outline so nothing
+   reflows — the existing technique, recoloured to the brand. */
+.v7-input:focus, .v7-textarea:focus {
+  border-color: var(--brand-primary-500);
+  outline: .5px solid var(--brand-primary-500); outline-offset: 0;
+}
+
+/* ── bottle ──────────────────────────────────────────────────────────────── */
+.v7-types { display: flex; gap: 8px; }
+.v7-type {
+  flex: 1 1 0; min-width: 0; height: 80px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-chip); overflow: clip;
+  background: var(--v7-well);
+  border: 1px solid var(--v7-well-border);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.v7-type[aria-pressed="true"] { background: var(--v7-raised); border-color: var(--v7-raised-border); }
+.v7-type img { height: 66%; width: auto; object-fit: contain; }
+
+.v7-colors { display: flex; gap: 6px; }
+.v7-color {
+  position: relative;
+  flex: 1 1 0; min-width: 0; height: 38px;
+  /* rounded-xl (12px) as of this pass — these were full pills last round. */
+  border-radius: var(--r-field); overflow: clip;
+  box-shadow: var(--box-shadow-subtle);
+}
+.v7-color i {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; opacity: 0; transform: scale(.6);
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
+  transition: opacity 150ms ease, transform 220ms cubic-bezier(.34,1.56,.64,1);
+}
+.v7-color[aria-pressed="true"] i { opacity: 1; transform: none; }
+
+/* ── timing ──────────────────────────────────────────────────────────────── */
+.v7-clockwrap {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px 0; border-radius: var(--r-chip);
+  background: var(--v7-well);
+  border: 1px solid var(--v7-well-border);
+  transition: border-color 150ms ease;
+}
+.v7-clockwrap:focus-within { border-color: var(--brand-primary-500); outline: .5px solid var(--brand-primary-500); }
+.v7-clock {
+  position: absolute; inset: 0; width: 100%;
+  background: none; border: 0; outline: none; text-align: center;
+  font-family: var(--font-sans); font-size: 80px; line-height: 1;
+  font-weight: var(--font-semibold);
+  color: transparent; caret-color: var(--v7-strong);
+}
+.v7-clock-mirror {
+  pointer-events: none; user-select: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 80px; line-height: 1; font-weight: var(--font-semibold);
+  color: var(--v7-strong);
+}
+/* SF Pro Rounded centres the colon on the x-height band, so it reads low
+   between full-height numerals. -0.08em == the export's -6.4px at 80px. */
+.v7-clock-mirror .colon { color: var(--text-muted); transform: translateY(-.08em); }
+.v7-every { display: flex; align-items: center; gap: 4px; }
+.v7-every-label { font-size: 15px; line-height: 1.2; font-weight: var(--font-semibold); color: var(--text-muted); flex-shrink: 0; }
+.v7-every-value { font-size: 15px; line-height: 1.2; font-weight: var(--font-semibold); color: var(--v7-label); font-variant-numeric: tabular-nums; }
+
+/* ── appearance ──────────────────────────────────────────────────────────── */
+.v7-themes {
+  display: flex; gap: 2px;
+  padding: 2px; border-radius: 16px;
+  background: var(--v7-well);
+}
+.v7-theme {
+  flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 10px 6px; border-radius: 10px;
+  color: var(--text-tertiary);
+  font-size: 15px; font-weight: var(--font-medium);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+/* Both states are 15px now (they were 14 vs 12.4 last round), so the row no
+   longer re-flows on size — only the weight still changes, which shifts widths
+   by a hair. */
+.v7-theme[aria-pressed="true"] {
+  background: var(--v7-raised); border-radius: 16px;
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+}
+.v7-theme svg { flex-shrink: 0; }
+
+/* ── stacked ─────────────────────────────────────────────────────────────
+   Derived: 290 control + 8 gap + 32 page padding = 330 fixed, and the preview
+   stops showing a legible toast below ~320. 660 is where the preview has
+   finished shrinking and the layout has to change instead. The preview becomes
+   a rigid top row, so it is pinned without position:sticky. */
+@container app (max-width: 660px) {
+  .v7-nav { padding: 12px 16px; }
+  /* Icon only on mobile — the wordmark's job is done by the mark alone once
+     the nav is competing with the links for a 320px line. */
+  .v7-wordmark { display: none; }
+  .v7-body { flex-direction: column; }
+  .v7-preview { flex: 0 0 auto; padding: 12px; }
+  .v7-preview-inner { gap: 10px; }
+  .v7-controls { flex: 1 1 auto; flex-basis: auto; width: 100%; }
+}
+
+/* Toast is centred in the pane, but it enters from ABOVE: the shipped Toaster
+   defaults to top-right, so downward is the direction the real thing arrives
+   from. Durations/curves are the shipped tokens. */
+@media (prefers-reduced-motion: no-preference) {
+  .v7-preview .toast.leaving { animation: stage-out-top var(--sip-exit-duration)  var(--sip-ease-out) both; }
+  .v7-preview .toast.replay  { animation: stage-in-top  var(--sip-enter-duration) var(--sip-ease-in)  both; }
+}
+/* Test stays visible under reduced motion here, unlike variant 6's quiet strip
+   button — it is a primary element of this design. It simply has nothing to
+   replay. That is a limit of the prototype, not the product: in the real app
+   Test fires an actual toast, which still appears (instantly) either way. */
+@media (prefers-reduced-motion: reduce) {
+  .v7-preview .toast.leaving,
+  .v7-preview .toast.replay { animation: none; }
+}
+
+/* ── info modal ──────────────────────────────────────────────────────────── */
+.v7-scrim {
+  position: absolute; inset: 0; z-index: 40;
+  background: var(--v7-scrim);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .v7-scrim { animation: scrim-in 180ms ease-out both; }
+  .v7-modal { animation: modal-in 260ms cubic-bezier(.22,.61,.36,1) both; }
+}
+@keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+
+.v7-modal {
+  width: min(650px, 100%);
+  /* min-height, not height: at 314px fixed the copy overflows once the modal
+     narrows and the paragraph wraps to more lines. */
+  min-height: min(314px, 100%);
+  display: flex; flex-direction: column; justify-content: space-between; gap: 24px;
+  padding: 24px; border-radius: var(--r-modal); overflow: clip;
+  background: var(--v7-modal);
+  border: .5px solid var(--v7-modal-border);
+  box-shadow: 0 24px 60px rgba(0,0,0,.18);
+}
+.v7-modal-head { display: flex; align-items: center; justify-content: space-between; }
+.v7-modal-title { font-size: 18px; line-height: 1.5; font-weight: var(--font-semibold); color: var(--v7-strong); }
+.v7-modal-x {
+  width: 24px; height: 24px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); transition: color 150ms ease;
+}
+.v7-modal-x:hover { color: var(--text-secondary); }
+.v7-modal-body { display: flex; flex-direction: column; align-items: flex-start; gap: 32px; }
+.v7-modal-copy { font-size: 15px; line-height: 1.5; font-weight: var(--font-medium); color: var(--text-muted); }
+.v7-modal-links { display: flex; flex-direction: column; gap: 4px; }
+.v7-modal-link {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; line-height: 1.5; font-weight: var(--font-semibold);
+  color: var(--v7-label); text-decoration: none;
+  transition: color 150ms ease;
+}
+.v7-modal-link:hover { color: var(--v7-strong); }
+.v7-modal-link .ext { display: flex; align-items: center; gap: 2px; }
+.v7-modal-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 15px; line-height: 1.5; font-weight: var(--font-medium); color: var(--text-muted);
+}
+.v7-modal-meta { display: flex; align-items: center; gap: 8px; }
+
+/* ═══ TOASTS (live test) ═══════════════════════════════════════════════════ */
+#toasts {
+  position: absolute; top: 16px; right: 16px; z-index: 60;
+  display: flex; flex-direction: column; gap: 10px;
+  align-items: flex-end; pointer-events: none;
+  max-width: min(450px, calc(100% - 32px));
+}
+#toasts .toast { pointer-events: auto; animation: sip-in 380ms cubic-bezier(.22,.61,.36,1) both; }
+#toasts .toast.out { animation: sip-out 260ms ease-in both; }
+@keyframes sip-in  { from { opacity: 0; transform: translateY(-100%) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes sip-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-100%) scale(.98); } }
+
+/* ═══ CONTROL WIDGET ═══════════════════════════════════════════════════════
+   Deliberately NOT themed with the app tokens — it must never be mistaken for
+   part of the design under test.                                            */
+#widget {
+  position: fixed; z-index: 999;
+  width: 232px;
+  /* Adding variant 6 pushed the panel past 500px tall, which is more than a
+     short laptop window in a device-frame session. Cap it and let the body
+     scroll rather than let it hang off the bottom where the clamp can't help:
+     clamping cannot rescue a panel taller than the viewport. */
+  max-height: calc(100vh - 16px);
+  display: flex; flex-direction: column;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 11px; line-height: 1.35;
+  color: #E7E7EA;
+  background: rgba(24,24,27,.9);
+  backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  overflow: hidden;
+  user-select: none;
+}
+#widget.dragging { cursor: grabbing; }
+#widget.hidden { display: none; }
+#w-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  cursor: grab;
+  background: rgba(255,255,255,.05);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+#widget.dragging #w-head { cursor: grabbing; }
+#w-head .grip { color: rgba(255,255,255,.35); letter-spacing: 1px; }
+#w-head .t { flex: 1; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 10px; color: rgba(255,255,255,.75); }
+#w-head button { color: rgba(255,255,255,.5); padding: 2px 4px; border-radius: 4px; font-size: 11px; }
+#w-head button:hover { color: #fff; background: rgba(255,255,255,.1); }
+#w-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 10px; display: flex; flex-direction: column; gap: 10px;
+}
+#widget.collapsed #w-body { display: none; }
+.w-group { display: flex; flex-direction: column; gap: 4px; }
+.w-label { font-size: 9px; letter-spacing: .09em; text-transform: uppercase; color: rgba(255,255,255,.35); padding-left: 1px; }
+.w-btn {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; text-align: left;
+  padding: 5px 7px; border-radius: 6px;
+  color: rgba(255,255,255,.62);
+  border: 1px solid transparent;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.w-btn:hover { background: rgba(255,255,255,.07); color: #fff; }
+.w-btn[aria-pressed="true"] { background: rgba(99,160,234,.22); border-color: rgba(99,160,234,.5); color: #fff; }
+.w-btn .k { width: 12px; color: rgba(255,255,255,.3); font-size: 10px; }
+.w-btn[aria-pressed="true"] .k { color: rgba(255,255,255,.6); }
+.w-row { display: flex; gap: 4px; }
+.w-row .w-btn { justify-content: center; padding: 5px 4px; }
+select#w-frame {
+  width: 100%; padding: 5px 7px; border-radius: 6px;
+  background: rgba(255,255,255,.07); color: #fff;
+  border: 1px solid rgba(255,255,255,.12);
+  font-family: inherit; font-size: 11px; outline: none;
+}
+select#w-frame option { background: #232326; }
+#w-fit {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 8px; border-radius: 7px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.04);
+}
+#w-fit .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+#w-fit[data-ok="1"] .dot { background: #37D399; box-shadow: 0 0 8px rgba(55,211,153,.7); }
+#w-fit[data-ok="0"] .dot { background: #F75951; box-shadow: 0 0 8px rgba(247,89,81,.7); }
+#w-fit .txt { flex: 1; min-width: 0; }
+#w-fit .hd { font-weight: 600; letter-spacing: .04em; }
+#w-fit[data-ok="1"] .hd { color: #6FE3B6; }
+#w-fit[data-ok="0"] .hd { color: #FF8A84; }
+#w-fit .sub { color: rgba(255,255,255,.42); font-size: 10px; }
+#w-hint { color: rgba(255,255,255,.3); font-size: 10px; line-height: 1.45; border-top: 1px solid rgba(255,255,255,.08); padding-top: 8px; }
+#w-hint b { color: rgba(255,255,255,.55); font-weight: 600; }
+#w-show {
+  position: fixed; z-index: 999; left: 16px; bottom: 16px; display: none;
+  padding: 7px 11px; border-radius: 999px;
+  background: rgba(24,24,27,.9); color: #fff;
+  border: 1px solid rgba(255,255,255,.14);
+  font-family: ui-monospace, monospace; font-size: 11px;
+  backdrop-filter: blur(12px);
+}
+#w-show.on { display: block; }
+</style>
+</head>
+
+<body>
+
+<div id="frame" data-mode="fill">
+  <div id="stage">
+    <div class="app" id="app"></div>
+    <div id="toasts"></div>
+  </div>
+</div>
+
+<div id="widget">
+  <div id="w-head">
+    <span class="grip">⠿</span>
+    <span class="t">Layout study</span>
+    <button id="w-collapse" title="Collapse">–</button>
+    <button id="w-hide" title="Hide (h)">✕</button>
+  </div>
+  <div id="w-body">
+    <div class="w-group">
+      <span class="w-label">Variant</span>
+      <div id="w-variants"></div>
+    </div>
+    <div class="w-group">
+      <span class="w-label">Device / viewport</span>
+      <select id="w-frame"></select>
+    </div>
+    <div class="w-group">
+      <span class="w-label">Theme</span>
+      <div class="w-row" id="w-themes"></div>
+    </div>
+    <div class="w-group" id="w-v6opts" hidden>
+      <span class="w-label">Editor · open question</span>
+      <button class="w-btn" id="w-test" aria-pressed="true"><span class="k">T</span><span>Test button</span></button>
+      <span class="w-label" style="margin-top:4px">Test hold · exit→◆→enter</span>
+      <div class="w-row" id="w-hold"></div>
+    </div>
+    <div id="w-fit" data-ok="1">
+      <span class="dot"></span>
+      <span class="txt"><span class="hd" id="w-fit-hd">FITS</span><br><span class="sub" id="w-fit-sub">—</span></span>
+    </div>
+    <div id="w-hint">
+      <b>1–7</b> variant · <b>[ ]</b> device · <b>d</b> dark · <b>h</b> hide<br>
+      Drag the title bar to move this panel.
+    </div>
+  </div>
+</div>
+<button id="w-show">⠿ study</button>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATA — mirrors packages/types (BottleType / BottleColor / DEFAULT_PREFS)
+   ═════════════════════════════════════════════════════════════════════════ */
+const TYPES = [
+  { id: 'classic', label: 'Classic', n: 1, file: 'yeti' },
+  { id: 'wide',    label: 'Wide',    n: 3, file: 'bibs' },
+  { id: 'sport',   label: 'Sport',   n: 2, file: 'camelbak' },
+]
+const COLORS = [
+  { id: 'red',    hex: '#E8362D', n: 1 },
+  { id: 'orange', hex: '#F47E47', n: 2 },
+  { id: 'yellow', hex: '#F2CE33', n: 3 },
+  { id: 'green',  hex: '#00B97D', n: 4 },
+  { id: 'blue',   hex: '#5FB2EB', n: 5 },
+  { id: 'purple', hex: '#B938F6', n: 6 },
+]
+// Asset paths are relative to prototypes/ — the prototype reads the real
+// bottle renders and app icons out of the repo, so nothing is faked.
+const BOTTLES_DIR = '../packages/ui/src/bottles'
+const ICONS_DIR   = '../apps/extension/public/icons'
+
+function bottleUrl(typeId, colorId) {
+  const t = TYPES.find(x => x.id === typeId)
+  const c = COLORS.find(x => x.id === colorId)
+  return `${BOTTLES_DIR}/${t.n}.${c.n}-${t.file}-${colorId}.png`
+}
+function iconUrl(dark) { return `${ICONS_DIR}/sip-icon${dark ? '-dark' : ''}-64.png` }
+
+const state = {
+  bottleType: 'classic',
+  bottleColor: 'blue',
+  titleText: 'Drink Up!',
+  messageText: 'Sending you a friendly reminder to drink some water.',
+  intervalMinutes: 15,
+  customIcon: null,
+  showLogo: true,
+  theme: 'system',
+}
+// Exploratory, NOT in SipPrefs yet. Modelled on Sonner's six positions, which
+// is what `<Toaster position=...>` actually accepts — so shipping it is a
+// one-prop change rather than owning placement ourselves. (Dead-centre, which
+// came up as an option, is the exception: Sonner has no such position, so it
+// would mean taking over positioning entirely. Left out on purpose.)
+const POSITIONS = [
+  'top-left', 'top-center', 'top-right',
+  'bottom-left', 'bottom-center', 'bottom-right',
+]
+let toastPosition = 'top-right'
+
+let clockInput = '00:15'
+let activeSection = 'bottle'
+let variant = 1
+let sheetOpen = true   // variant 4 only
+let modalOpen = false  // variant 7's Info modal
+let showTest = true    // variant 6 only — prototype chrome flag, so the Test
+                       // button can be A/B'd against no Test button at all
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ICONS
+   ═════════════════════════════════════════════════════════════════════════ */
+const ICON = {
+  bottle: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v2.5a3 3 0 0 0 .8 2l.9 1a4 4 0 0 1 1.1 2.7V19a3 3 0 0 1-3 3h-3.6a3 3 0 0 1-3-3v-8.8a4 4 0 0 1 1.1-2.7l.9-1a3 3 0 0 0 .8-2V2Z"/><path d="M7.2 12.5h9.6"/></svg>`,
+  text: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5V5h16v1.5"/><path d="M12 5v14"/><path d="M9 19h6"/></svg>`,
+  time: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2"/></svg>`,
+  icon: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.8" cy="9" r="1.6"/><path d="M3.6 17.2 8 13.2a2 2 0 0 1 2.7 0l3.4 3.2"/><path d="m13 15.2 1.9-1.8a2 2 0 0 1 2.7 0l2.7 2.5"/></svg>`,
+  appearance: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" stroke="none"/></svg>`,
+  x: `<svg width="11" height="11" viewBox="0 0 8 8" fill="currentColor"><path d="M6.8 7.6.4 1.2A.6.6 0 0 1 1.2.4l6.4 6.4a.6.6 0 0 1-.8.8Z"/><path d="M.4 7.6a.6.6 0 0 1 0-.8L6.8.4a.6.6 0 0 1 .8.8L1.2 7.6a.6.6 0 0 1-.8 0Z"/></svg>`,
+  check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9.86 18a1 1 0 0 1-.73-.32l-4.86-5.17a1 1 0 1 1 1.46-1.37l4.12 4.39 8.41-9.2a1 1 0 1 1 1.48 1.34l-9.14 10a1 1 0 0 1-.73.33z"/></svg>`,
+}
+function themeIcon(t) {
+  if (t === 'system') return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v10c0 3-1.5 5-5 5H8c-3.5 0-5-2-5-5V7c0-3 1.5-5 5-5h8c3.5 0 5 2 5 5Z"/><rect x="6" y="5" width="12" height="6" rx="1.75"/><path d="m10.3 15.3-2.3 2.3m0-2.3 2.3 2.3"/></svg>`
+  if (t === 'light')  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6.5"/><path d="M12 2v.6M12 21.4v.6M2 12h.6M21.4 12h.6M4.9 4.9l.4.4M18.7 18.7l.4.4M19.1 4.9l-.4.4M5.3 18.7l-.4.4" stroke-width="2"/></svg>`
+  return `<svg width="15" height="15" viewBox="-1.5 -1.3 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M.78 11.18c.36 5.15 4.73 9.34 9.96 9.57 3.69.16 6.99-1.56 8.97-4.27.82-1.11.38-1.85-.99-1.6-.67.12-1.36.17-2.08.14-4.89-.2-8.89-4.29-8.91-9.12-.01-1.3.26-2.53.75-3.65.54-1.24-.11-1.83-1.36-1.3C3.16 2.62.45 6.61.78 11.18Z"/></svg>`
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═════════════════════════════════════════════════════════════════════════ */
+const $  = (s, r = document) => r.querySelector(s)
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s))
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]))
+
+const mqDark = window.matchMedia('(prefers-color-scheme: dark)')
+function isDark() { return state.theme === 'dark' || (state.theme === 'system' && mqDark.matches) }
+
+let themeArmed = false, themeTimer
+function applyTheme() {
+  const html = document.documentElement
+  if (themeArmed) {
+    themeArmed = false
+    html.setAttribute('data-theme-transitioning', '')
+    clearTimeout(themeTimer)
+    themeTimer = setTimeout(() => html.removeAttribute('data-theme-transitioning'), 350)
+  }
+  if (state.theme === 'system') html.removeAttribute('data-theme')
+  else html.setAttribute('data-theme', state.theme)
+}
+function setTheme(t) { themeArmed = true; state.theme = t; applyTheme(); sync(); save() }
+mqDark.addEventListener('change', () => { if (state.theme === 'system') sync() })
+
+function intervalWords(m) {
+  const h = Math.floor(m / 60), mm = m % 60
+  const parts = []
+  if (h) parts.push(`${h} ${h === 1 ? 'Hour' : 'Hours'}`)
+  if (mm) parts.push(`${mm} ${mm === 1 ? 'Minute' : 'Minutes'}`)
+  return parts.join(' ') || '0 Minutes'
+}
+function parseClock(s) {
+  const m = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return null
+  const h = +m[1], mi = +m[2]
+  if (h > 24 || mi > 59) return null
+  if (h === 24 && mi !== 0) return null
+  const total = h * 60 + mi
+  return total >= 1 && total <= 1440 ? total : null
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION CONTENT — one source of truth, reused by all five variants.
+   Returns inner content only; each variant supplies its own card chrome.
+   ═════════════════════════════════════════════════════════════════════════ */
+const SECTIONS = [
+  { id: 'bottle',     label: 'Bottle' },
+  { id: 'text',       label: 'Text' },
+  { id: 'time',       label: 'Time' },
+  { id: 'icon',       label: 'Icon' },
+  { id: 'appearance', label: 'Appearance' },
+]
+
+const CONTENT = {
+  // opts.hero === false drops the 230px bottle preview. Variant 6 does that:
+  // the toast in the stage already shows the selected bottle, and each of the
+  // three type thumbs shows it too, so the hero is the same information a
+  // third time — and it is the single largest consumer of vertical space in
+  // the whole layout.
+  bottle: (opts = {}) => `
+    <div class="sec">
+      ${opts.hero === false ? '' : '<div class="hero"><img data-bind="hero" alt=""></div>'}
+      <div class="field">
+        <span class="sublabel" style="padding-left:4px">Type</span>
+        <div class="row-spread">
+          ${TYPES.map(t => `
+            <button class="thumb btn-press" data-act="type" data-type="${t.id}" aria-pressed="false" title="${t.label}">
+              <img data-bind="thumb" data-type="${t.id}" alt="${t.label}">
+            </button>`).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <span class="sublabel" style="padding-left:4px">Color</span>
+        <div class="row-spread">
+          ${COLORS.map(c => `
+            <button class="swatch btn-press" data-act="color" data-color="${c.id}" aria-pressed="false"
+                    aria-label="${c.id}" style="background:${c.hex};color:${c.hex}"></button>`).join('')}
+        </div>
+      </div>
+    </div>`,
+
+  text: () => `
+    <div class="sec">
+      <div class="field">
+        <div class="field-head">
+          <span class="sublabel">Title</span>
+          <span class="count" data-bind="titleCount"></span>
+        </div>
+        <input class="input" data-bind="titleInput" data-act="title" maxlength="40" value="${esc(state.titleText)}">
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <span class="sublabel">Message</span>
+          <span class="count" data-bind="msgCount"></span>
+        </div>
+        <textarea class="textarea" data-bind="msgInput" data-act="msg" maxlength="60">${esc(state.messageText)}</textarea>
+      </div>
+    </div>`,
+
+  time: () => `
+    <div class="sec">
+      <div class="clockwrap">
+        <input class="clock" data-bind="clock" inputmode="numeric" maxlength="5" value="${clockInput}" aria-label="Interval">
+        <div class="clock-mirror" aria-hidden="true" data-bind="clockMirror"></div>
+      </div>
+      <div class="every">
+        <span class="every-label">Every:</span>
+        <span class="every-value" data-bind="every"></span>
+      </div>
+    </div>`,
+
+  icon: () => `
+    <div class="sec">
+      <div style="display:flex;align-items:center;gap:var(--gap)">
+        <div class="iconbox"><img data-bind="iconPreview" alt=""></div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start;min-width:0">
+          <button class="linkbtn" data-act="upload">Upload Custom</button>
+          <button class="linkbtn" data-act="resetIcon" data-bind="resetIcon" hidden>Use default</button>
+          <div class="checkrow" data-act="showLogo" role="checkbox" aria-checked="true" tabindex="0">
+            <span class="checkbox" data-bind="check"></span>
+            <span class="checklabel">Show Logo</span>
+          </div>
+        </div>
+      </div>
+    </div>`,
+
+  appearance: () => `
+    <div class="sec">
+      <div class="theme-row">
+        ${['system','light','dark'].map(t => `
+          <button class="theme-btn" data-act="theme" data-theme="${t}" aria-pressed="false">
+            ${themeIcon(t)}<span>${t[0].toUpperCase() + t.slice(1)}</span>
+          </button>`).join('')}
+      </div>
+    </div>`,
+
+  // Variant 6 only. Included because it is the setting that decides the
+  // stage-on-the-right question: with the toast pinned top-right of a stage
+  // that stands in for the screen, the layout mirrors reality. Each button is
+  // a mini screen with the toast's slot marked, so the picker teaches what the
+  // stage is without needing a caption on the stage itself.
+  position: () => `
+    <div class="sec">
+      <div class="pos-grid">
+        ${POSITIONS.map(p => `
+          <button class="pos-btn" data-act="pos" data-pos="${p}" aria-pressed="false"
+                  aria-label="${p.replace('-', ' ')}" title="${p.replace('-', ' ')}"><i></i></button>`).join('')}
+      </div>
+    </div>`,
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHARED CHROME FRAGMENTS
+   ═════════════════════════════════════════════════════════════════════════ */
+function brandHTML() {
+  return `<div class="brand">
+    <img data-bind="brandIcon" alt="Sip">
+    <span class="wordmark">Sip Hydra</span>
+  </div>`
+}
+function navLinksHTML() {
+  return `<div class="navlinks">
+    <a class="navlink" href="#" onclick="return false">Info</a>
+    <a class="navlink" href="#" onclick="return false">Download</a>
+  </div>`
+}
+// opts.logo === false omits the logo beside the title. Variant 7 uses it: the
+// new design removes the Icon card, and with it `showLogo` / `customIcon`, so
+// the toast has nothing to put there.
+function toastHTML(opts = {}) {
+  return `<div class="toast">
+    <div class="toast-row">
+      <div class="toast-left">
+        <div class="toast-bottle">
+          <img class="sip-bottle-shimmer" data-bind="toastBottle" alt="">
+          <div class="sip-bottle-shimmer-overlay" data-bind="toastShimmer"></div>
+        </div>
+        <div class="toast-body">
+          <div class="toast-head">
+            <div class="toast-titlerow">
+              <span class="toast-title" data-nofit data-bind="toastTitle"></span>
+              ${opts.logo === false ? '' : '<span class="toast-logo" data-bind="toastLogo"><img data-bind="toastLogoImg" alt=""></span>'}
+            </div>
+            <p class="toast-msg" data-bind="toastMsg"></p>
+          </div>
+          <span class="toast-cta">Edit preferences</span>
+        </div>
+      </div>
+      <span class="toast-x">${ICON.x}</span>
+    </div>
+  </div>`
+}
+function previewCardHTML() {
+  return `<div class="card preview-card">
+    ${toastHTML()}
+    <button class="pill btn-press" data-act="test">Test</button>
+  </div>`
+}
+function tabsHTML(cls, opts = {}) {
+  return SECTIONS.map(s => `
+    <button data-act="section" data-section="${s.id}" aria-selected="${activeSection === s.id}"
+            role="tab" title="${s.label}">
+      ${opts.icons === false ? '' : ICON[s.id]}${opts.labels === false ? '' : `<span class="lbl">${s.label}</span>`}
+    </button>`).join('')
+}
+function panelHTML() {
+  const s = SECTIONS.find(x => x.id === activeSection)
+  return `<div class="panel panel-anim" key="${activeSection}">
+    <div class="panel-head">
+      <span class="card-title">${s.label}</span>
+    </div>
+    ${CONTENT[activeSection]()}
+  </div>`
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARIANTS
+   ═════════════════════════════════════════════════════════════════════════ */
+const VARIANTS = {
+  /* 1 — Segmented ---------------------------------------------------------- */
+  1: () => `
+    <div class="v1">
+      <div class="nav nav-center">
+        <div class="cluster">
+          ${brandHTML()}
+          <span class="divider"></span>
+          ${navLinksHTML()}
+        </div>
+      </div>
+      <div class="v1-col">
+        ${previewCardHTML()}
+        <div class="segbar" role="tablist">${tabsHTML()}</div>
+        <div class="card panel-card">${panelHTML()}</div>
+      </div>
+    </div>`,
+
+  /* 2 — Rail / Tab bar ----------------------------------------------------- */
+  2: () => `
+    <div class="v2">
+      <div class="topbar">${brandHTML()}${navLinksHTML()}</div>
+      <div class="v2-body">
+        <aside class="rail" role="tablist">
+          <div class="rail-top">${brandHTML()}</div>
+          ${tabsHTML()}
+          <div class="rail-foot">${navLinksHTML()}</div>
+        </aside>
+        <main class="v2-main">
+          ${previewCardHTML()}
+          <div class="card panel-card">${panelHTML()}</div>
+        </main>
+      </div>
+      <nav class="tabbar" role="tablist">${tabsHTML()}</nav>
+    </div>`,
+
+  /* 3 — Inspector split ---------------------------------------------------- */
+  3: () => `
+    <div class="v3">
+      <div class="nav">${brandHTML()}${navLinksHTML()}</div>
+      <div class="v3-body">
+        <section class="v3-canvas">
+          <div class="canvas-toast">${toastHTML()}</div>
+          <div class="canvas-foot">
+            <span class="canvas-note">This area stands in for the screen — the reminder lands in the top-right corner.</span>
+            <button class="pill btn-press" data-act="test">Test</button>
+          </div>
+        </section>
+        <section class="card v3-inspector">
+          <div class="v3-tabs" role="tablist">${tabsHTML(null, { labels: false })}</div>
+          ${panelHTML()}
+        </section>
+      </div>
+    </div>`,
+
+  /* 4 — Control dock ------------------------------------------------------- */
+  4: () => `
+    <div class="v4">
+      <div class="nav">${brandHTML()}${navLinksHTML()}</div>
+      <div class="v4-stage">
+        ${toastHTML()}
+        <button class="pill btn-press" data-act="test">Test</button>
+      </div>
+      <div class="v4-sheet" ${sheetOpen ? '' : 'hidden'}>
+        <div class="card">${panelHTML()}</div>
+      </div>
+      <div class="dock-wrap">
+        <nav class="dock" role="tablist">
+          ${SECTIONS.map(s => `
+            <button data-act="dock" data-section="${s.id}" role="tab"
+                    aria-selected="${sheetOpen && activeSection === s.id}" title="${s.label}">
+              ${ICON[s.id]}<span class="lbl">${s.label}</span>
+            </button>`).join('')}
+        </nav>
+      </div>
+    </div>`,
+
+  /* 5 — Adaptive ----------------------------------------------------------- */
+  5: () => {
+    const roomy = v5Roomy()
+    if (roomy) {
+      // Enough room for everything at once — a *fitted* bento, still no scroll.
+      return `
+      <div class="v5">
+        <div class="nav">${brandHTML()}${navLinksHTML()}</div>
+        <div class="v5-body">
+          <div class="v5-left">
+            ${previewCardHTML()}
+            <div class="card" style="flex:0 1 auto;min-height:0;padding:var(--cardpad);display:flex;flex-direction:column;gap:var(--gap)">
+              <span class="card-title" style="padding-left:4px">Text</span>
+              ${CONTENT.text()}
+            </div>
+          </div>
+          <div class="v5-grid">
+            <div class="card cell-bottle">
+              <span class="card-title" style="padding:0 4px 10px">Bottle</span>
+              ${CONTENT.bottle()}
+            </div>
+            <div class="card cell-time">
+              <span class="card-title" style="padding:0 4px 10px">Time</span>
+              ${CONTENT.time()}
+            </div>
+            <div class="card cell-icon">
+              <span class="card-title" style="padding:0 4px 10px">Icon</span>
+              ${CONTENT.icon()}
+            </div>
+            <div class="card cell-appearance">
+              <span class="card-title" style="padding:0 4px 10px">Appearance</span>
+              ${CONTENT.appearance()}
+            </div>
+          </div>
+        </div>
+      </div>`
+    }
+    return `
+      <div class="v5">
+        <div class="nav">${brandHTML()}${navLinksHTML()}</div>
+        <div class="v5-body v5-compact">
+          ${previewCardHTML()}
+          <div class="segbar" role="tablist">${tabsHTML()}</div>
+          <div class="card panel-card">${panelHTML()}</div>
+        </div>
+      </div>`
+  },
+
+  /* 6 — Editor (controls left, stage right) ------------------------------- */
+  6: () => {
+    // Flat, not grouped. Six sections with one heading each is already
+    // scannable; adding a second tier of group labels would mean nine labels
+    // for six things. Group them if this ever reaches ~10 sections, not before.
+    const SECS = [
+      ['Message',    CONTENT.text()],
+      ['Bottle',     CONTENT.bottle({ hero: false })],
+      ['Icon',       CONTENT.icon()],
+      ['Appearance', CONTENT.appearance()],
+      ['Timing',     CONTENT.time()],
+      ['Position',   CONTENT.position()],
+    ]
+    return `
+      <div class="v6">
+        <div class="nav">${brandHTML()}${navLinksHTML()}</div>
+        <div class="v6-body">
+          <section class="v6-stage-wrap">
+            <div class="v6-stage" data-bind="stage" data-pos="${toastPosition}">
+              <div class="toast-slot">${toastHTML()}</div>
+            </div>
+            <div class="v6-strip">
+              <span class="v6-strip-label">Preview</span>
+              <button class="testbtn" data-act="replay" ${showTest ? '' : 'hidden'}>Test</button>
+            </div>
+          </section>
+          <section class="v6-controls">
+            <div class="card v6-panel" data-scroll-ok>
+              ${SECS.map(([title, body]) => `
+                <div class="v6-sec">
+                  <span class="v6-sec-title">${title}</span>
+                  ${body}
+                </div>`).join('')}
+            </div>
+          </section>
+        </div>
+      </div>`
+  },
+
+  /* 7 — The design (Paper export, Aug 24) --------------------------------- */
+  7: () => `
+    <div class="v7">
+      <div class="v7-nav">
+        <div class="v7-brand">
+          ${SIP_MARK}
+          <span class="v7-wordmark">Sip Hydra</span>
+        </div>
+        <div class="v7-navlinks">
+          <button class="v7-navlink" data-act="modal">Info</button>
+          <a class="v7-navlink" href="#" onclick="return false">Download</a>
+        </div>
+      </div>
+
+      <div class="v7-body">
+        <section class="v7-preview" data-bind="stage" data-pos="top-right">
+          <div class="v7-preview-inner">
+            ${toastHTML({ logo: false })}
+            <button class="v7-test" data-act="replay">Test</button>
+          </div>
+        </section>
+
+        <section class="v7-controls">
+          <div class="v7-scroller" data-scroll-ok>
+            ${V7_MESSAGE()}
+            ${V7_BOTTLE()}
+            ${V7_TIMING()}
+            ${V7_APPEARANCE()}
+          </div>
+        </section>
+      </div>
+
+      ${modalOpen ? V7_MODAL() : ''}
+    </div>`,
+}
+
+// ─── variant 7 sections ───────────────────────────────────────────────────────
+// Written out rather than reusing CONTENT.*: the visual design changed enough
+// (uppercase headings, white wells in recessed cards, flex-1 chips, pill
+// swatches, no Icon card) that sharing markup with variants 1–6 would mean
+// branching every one of them on a flag. These are the shape that ships.
+
+const V7_MESSAGE = () => `
+  <div class="v7-card">
+    <span class="v7-card-title">Message</span>
+    <div class="v7-fields">
+      <div class="v7-field">
+        <div class="v7-field-head">
+          <span class="v7-label">Title</span>
+          <span class="v7-count" data-bind="titleCount"></span>
+        </div>
+        <input class="v7-input" data-bind="titleInput" data-act="title" maxlength="40" value="${esc(state.titleText)}">
+      </div>
+      <div class="v7-field">
+        <div class="v7-field-head">
+          <span class="v7-label">Message</span>
+          <span class="v7-count" data-bind="msgCount"></span>
+        </div>
+        <textarea class="v7-textarea" data-bind="msgInput" data-act="msg" maxlength="60">${esc(state.messageText)}</textarea>
+      </div>
+    </div>
+  </div>`
+
+const V7_BOTTLE = () => `
+  <div class="v7-card">
+    <span class="v7-card-title">Bottle</span>
+    <div class="v7-fields">
+      <div class="v7-field">
+        <span class="v7-label">Type</span>
+        <div class="v7-types">
+          ${TYPES.map(t => `
+            <button class="v7-type" data-act="type" data-type="${t.id}" aria-pressed="false" title="${t.label}">
+              <img data-bind="thumb" data-type="${t.id}" alt="${t.label}">
+            </button>`).join('')}
+        </div>
+      </div>
+      <div class="v7-field">
+        <span class="v7-label">Color</span>
+        <div class="v7-colors">
+          ${COLORS.map(c => `
+            <button class="v7-color" data-act="color" data-color="${c.id}" aria-pressed="false"
+                    aria-label="${c.id}" style="background:${c.hex}"><i>${ICON.check}</i></button>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>`
+
+const V7_TIMING = () => `
+  <div class="v7-card">
+    <span class="v7-card-title">Timing</span>
+    <div class="v7-clockwrap">
+      <input class="v7-clock" data-bind="clock" inputmode="numeric" maxlength="5" value="${clockInput}" aria-label="Interval">
+      <!-- data-nofit: the colon's -0.08em optical nudge is a transform, and
+           transforms count toward an ancestor's scrollable overflow, so the
+           fit meter reads this deliberate 6.4px lift as a 7px clip. Nothing is
+           actually cut — the clock box has visible overflow. -->
+      <div class="v7-clock-mirror" aria-hidden="true" data-nofit data-bind="clockMirror"></div>
+    </div>
+    <div class="v7-every">
+      <span class="v7-every-label">Every:</span>
+      <span class="v7-every-value" data-bind="every"></span>
+    </div>
+  </div>`
+
+const V7_APPEARANCE = () => `
+  <div class="v7-card">
+    <span class="v7-card-title">Appearance</span>
+    <div class="v7-themes">
+      ${['system','light','dark'].map(t => `
+        <button class="v7-theme" data-act="theme" data-theme="${t}" aria-pressed="false">
+          ${themeIcon(t)}<span>${t[0].toUpperCase() + t.slice(1)}</span>
+        </button>`).join('')}
+    </div>
+  </div>`
+
+// The supplied brand mark, inlined so it needs no asset path under file://.
+// Gradient id is namespaced — a bare "paint0_linear" would collide with any
+// other inlined SVG on the page and silently repaint one of them.
+const SIP_MARK = `<svg viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Sip Hydra">
+  <path d="M0 512C0 229.23 229.23 0 512 0V0C794.77 0 1024 229.23 1024 512V512C1024 794.77 794.77 1024 512 1024V1024C229.23 1024 0 794.77 0 512V512Z" fill="url(#sipMarkGrad)"/>
+  <path d="M758.006 535.607C740.026 543.125 720.357 545.207 701.11 543.373C688.397 542.158 676.853 538.622 665.316 533.806C658.989 531.162 653.713 527.511 648.222 523.545C632.876 512.458 618.64 496.117 610.863 478.924C605.819 467.788 602.109 456.808 600.444 444.656C596.08 412.799 602.018 378.034 612.726 347.706C615.352 338.305 619.559 330.109 623.418 321.236L629.994 306.142L654.583 256.548L660.14 245.453L676.124 213.431L693.756 178.221C696.654 172.421 699.71 166.894 704.845 162.805C709.938 158.748 717.682 159.103 722.378 163.796C726.361 167.778 729.823 172.553 732.448 177.642L745.699 203.245L756.433 224.758L765.617 242.983L799.564 310.496L803.415 319.088L810.024 334.05C817.685 351.391 822.828 369.608 825.81 388.378C826.977 395.747 828.418 402.67 828.907 409.957C830.199 429.256 829.114 443.838 823.706 462.286C819.341 477.157 812.525 490.449 802.289 502.098L786.628 517.779C778.404 526.007 768.698 531.146 758.031 535.607H758.006Z" fill="#FBFBFB"/>
+  <path d="M435.127 850.012C405.26 862.542 372.587 866.012 340.616 862.955C319.499 860.931 300.322 855.037 281.158 847.01C270.648 842.604 261.885 836.518 252.764 829.909C227.272 811.43 203.623 784.195 190.706 755.541C182.328 736.98 176.164 718.681 173.399 698.426C166.149 645.332 176.013 587.391 193.801 536.844C198.162 521.174 205.151 507.515 211.561 492.727L222.484 467.571L263.329 384.914L272.56 366.422L299.111 313.052L328.4 254.368C333.215 244.702 338.291 235.49 346.821 228.674C355.281 221.914 368.144 222.506 375.944 230.327C382.561 236.963 388.312 244.922 392.673 253.404L414.684 296.075L432.513 331.93L447.77 362.305L504.16 474.827L510.557 489.147L521.535 514.083C534.26 542.985 542.803 573.346 547.756 604.63C549.696 616.912 552.089 628.451 552.901 640.595C555.047 672.76 553.245 697.063 544.262 727.81C537.012 752.594 525.69 774.749 508.686 794.164L482.671 820.298C469.011 834.012 452.887 842.576 435.168 850.012H435.127Z" fill="#FBFBFB"/>
+  <defs><linearGradient id="sipMarkGrad" x1="512" y1="0" x2="512" y2="1024" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#00D9E7"/><stop offset="1" stop-color="#3D3BFF"/>
+  </linearGradient></defs>
+</svg>`
+
+const EXT_ICON = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.667 4.667h6.667v6.666"/><path d="M4.667 11.333 11.334 4.667"/></svg>`
+
+const V7_MODAL = () => `
+  <div class="v7-scrim" data-act="modal-close" role="dialog" aria-modal="true" aria-label="Information">
+    <div class="v7-modal" data-modal>
+      <div class="v7-modal-head">
+        <span class="v7-modal-title">Information</span>
+        <button class="v7-modal-x" data-act="modal-close" aria-label="Close">${ICON.x}</button>
+      </div>
+      <div class="v7-modal-body">
+        <p class="v7-modal-copy" style="margin:0">
+          I created Sip because I am notoriously bad at remembering to hydrate while
+          working on my computer. This Chrome extension helped me fix that, no matter
+          how locked in I can get. I hope it can help you out as well.
+        </p>
+        <div class="v7-modal-links">
+          <a class="v7-modal-link" href="#" onclick="return false">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1.6" width="16" height="14.8" rx="2.4"/><path d="M1 5.6h16"/><path d="M6.6 9.4h4.8"/></svg>
+            <span class="ext">Download${EXT_ICON}</span>
+          </a>
+          <a class="v7-modal-link" href="#" onclick="return false">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 16.2c-4.2 1.2-4.2-2.1-5.4-2.7m10.8 4.5v-2.9c0-.8.1-1.1-.4-1.6 2.3-.3 4.5-1.1 4.5-5a3.9 3.9 0 0 0-1.1-2.7 3.6 3.6 0 0 0-.1-2.7s-.9-.3-2.9 1.1a9.9 9.9 0 0 0-5.4 0C4.6.8 3.7 1.1 3.7 1.1a3.6 3.6 0 0 0-.1 2.7 3.9 3.9 0 0 0-1.1 2.8c0 3.8 2.2 4.6 4.5 4.9-.4.5-.4 1-.4 1.6v2.9"/></svg>
+            <span class="ext">Code${EXT_ICON}</span>
+          </a>
+        </div>
+      </div>
+      <div class="v7-modal-foot">
+        <span>mihalko.us</span>
+        <span class="v7-modal-meta"><span>v2.0.0</span><span>©2026</span></span>
+      </div>
+    </div>
+  </div>`
+
+// Variant 5's own decision rule. Deliberately a real measurement of the
+// container, not a width breakpoint: "all five at once" needs BOTH axes.
+function v5Roomy() {
+  const r = stage.getBoundingClientRect()
+  return r.width >= 1000 && r.height >= 720
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDER + SYNC
+   render() rebuilds the variant chrome. sync() pushes state into the DOM
+   without re-rendering, so typing never loses focus or caret position.
+   ═════════════════════════════════════════════════════════════════════════ */
+const app = $('#app')
+const stage = $('#stage')
+
+// Set by render() when variant 6's scrolling column exists; re-run on resize
+// so the "more below" cue tracks a viewport change, not just a scroll.
+let syncScrollHint = () => {}
+
+function render() {
+  app.innerHTML = VARIANTS[variant]()
+
+  const panel = app.querySelector('.v6-panel, .v7-scroller')
+  if (panel) {
+    const col = panel.closest('.v6-controls, .v7-controls')
+    syncScrollHint = () => {
+      const more = panel.scrollHeight - panel.clientHeight - panel.scrollTop > 4
+      col.dataset.more = more ? '1' : '0'
+    }
+    panel.addEventListener('scroll', syncScrollHint, { passive: true })
+  } else {
+    syncScrollHint = () => {}
+  }
+
+  sync()
+  syncScrollHint()
+  measureFit()
+}
+
+function sync() {
+  const dark = isDark()
+
+  $$('[data-bind="brandIcon"]', app).forEach(el => el.src = iconUrl(dark))
+
+  // bottle
+  const url = bottleUrl(state.bottleType, state.bottleColor)
+  $$('[data-bind="hero"]', app).forEach(el => el.src = url)
+  $$('[data-bind="thumb"]', app).forEach(el => el.src = bottleUrl(el.dataset.type, state.bottleColor))
+  $$('[data-act="type"]', app).forEach(el => el.setAttribute('aria-pressed', String(el.dataset.type === state.bottleType)))
+  $$('[data-act="color"]', app).forEach(el => el.setAttribute('aria-pressed', String(el.dataset.color === state.bottleColor)))
+
+  // text
+  // Variant 7 abbreviates to "Chars" — at 15px the full word no longer fits
+  // beside the label in a 290px column.
+  const unit = variant === 7 ? 'Chars' : 'Characters'
+  $$('[data-bind="titleCount"]', app).forEach(el => {
+    el.textContent = `${state.titleText.length}/40 ${unit}`
+    el.dataset.over = state.titleText.length >= 35 ? '1' : '0'
+  })
+  $$('[data-bind="msgCount"]', app).forEach(el => {
+    el.textContent = `${state.messageText.length}/60 ${unit}`
+    el.dataset.over = state.messageText.length >= 55 ? '1' : '0'
+  })
+  // Keep duplicate inputs (variant 5's roomy mode) in step without stealing
+  // the caret from the one being typed in.
+  $$('[data-bind="titleInput"]', app).forEach(el => { if (el !== document.activeElement) el.value = state.titleText })
+  $$('[data-bind="msgInput"]', app).forEach(el => { if (el !== document.activeElement) el.value = state.messageText })
+
+  // time
+  $$('[data-bind="clock"]', app).forEach(el => { if (el !== document.activeElement) el.value = clockInput })
+  $$('[data-bind="clockMirror"]', app).forEach(el => {
+    el.innerHTML = `${clockInput.slice(0,2)}<span class="colon">:</span>${clockInput.slice(3)}`
+  })
+  $$('[data-bind="every"]', app).forEach(el => el.textContent = intervalWords(state.intervalMinutes))
+
+  // icon
+  $$('[data-bind="iconPreview"]', app).forEach(el => el.src = state.customIcon || iconUrl(dark))
+  $$('[data-bind="resetIcon"]', app).forEach(el => el.hidden = !state.customIcon)
+  $$('[data-bind="check"]', app).forEach(el => el.innerHTML = state.showLogo ? ICON.check : '')
+  $$('[data-act="showLogo"]', app).forEach(el => el.setAttribute('aria-checked', String(state.showLogo)))
+
+  // position (variant 6)
+  $$('[data-bind="stage"]', app).forEach(el => el.dataset.pos = toastPosition)
+  $$('[data-act="pos"]', app).forEach(el => el.setAttribute('aria-pressed', String(el.dataset.pos === toastPosition)))
+
+  // appearance
+  $$('[data-act="theme"]', app).forEach(el => el.setAttribute('aria-pressed', String(el.dataset.theme === state.theme)))
+  $$('.w-btn[data-wtheme]').forEach(el => el.setAttribute('aria-pressed', String(el.dataset.wtheme === state.theme)))
+
+  // toast (preview + any live ones)
+  syncToast(app)
+  $$('#toasts .toast').forEach(t => syncToast(t))
+}
+
+// CSS mask-image is fetched under CORS rules even for same-directory assets,
+// and file:// has a null origin — so the shimmer mask is unfetchable when the
+// prototype is opened by double-clicking it. Left unguarded it paints an
+// unmasked white rectangle over the bottle and floods the console. The hue
+// rotation on the image itself is unaffected and still runs.
+const CAN_MASK = location.protocol !== 'file:'
+
+function syncToast(root) {
+  const dark = isDark()
+  const url = bottleUrl(state.bottleType, state.bottleColor)
+  $$('[data-bind="toastBottle"]', root).forEach(el => el.src = url)
+  $$('[data-bind="toastShimmer"]', root).forEach(el => {
+    if (!CAN_MASK) { el.style.display = 'none'; return }
+    el.style.maskImage = `url(${url})`
+    el.style.webkitMaskImage = `url(${url})`
+  })
+  $$('[data-bind="toastTitle"]', root).forEach(el => el.textContent = state.titleText || 'Title')
+  $$('[data-bind="toastMsg"]', root).forEach(el => el.textContent = state.messageText || 'Message')
+  $$('[data-bind="toastLogo"]', root).forEach(el => el.style.display = state.showLogo ? 'flex' : 'none')
+  $$('[data-bind="toastLogoImg"]', root).forEach(el => el.src = state.customIcon || iconUrl(dark))
+}
+
+// Re-render only the panel — used when switching section, so the preview card
+// and its images are never rebuilt (no image flash).
+// Replaces the .panel node itself rather than rewriting its parent: in the
+// inspector variant the parent also holds the tab strip, which rewriting the
+// parent would destroy mid-click.
+function renderPanel() {
+  const panels = $$('.panel', app)
+  if (!panels.length) return render()
+  panels.forEach(p => {
+    const tmp = document.createElement('div')
+    tmp.innerHTML = panelHTML()
+    p.replaceWith(tmp.firstElementChild)
+  })
+  $$('[data-act="section"], [data-act="dock"]', app).forEach(el => {
+    el.setAttribute('aria-selected', String(el.dataset.section === activeSection && (variant !== 4 || sheetOpen)))
+  })
+  sync()
+  measureFit()
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTERACTION
+   ═════════════════════════════════════════════════════════════════════════ */
+app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]')
+  if (!el) return
+  const act = el.dataset.act
+
+  if (act === 'type')  { state.bottleType = el.dataset.type; sync(); save() }
+  if (act === 'color') { state.bottleColor = el.dataset.color; sync(); save() }
+  if (act === 'theme') { setTheme(el.dataset.theme) }
+  if (act === 'showLogo') { state.showLogo = !state.showLogo; sync(); save() }
+  if (act === 'upload') pickIcon()
+  if (act === 'resetIcon') { state.customIcon = null; sync(); save() }
+  if (act === 'test') testToast()
+  if (act === 'modal') { modalOpen = true; render(); return }
+  if (act === 'modal-close') {
+    // Scrim and × share this action; ignore clicks that landed inside the card.
+    if (el.classList.contains('v7-scrim') && e.target.closest('[data-modal]')) return
+    modalOpen = false; render(); return
+  }
+  if (act === 'pos') { toastPosition = el.dataset.pos; sync(); replayToast(); save() }
+  if (act === 'replay') replayToast({ full: true })
+
+  if (act === 'section') {
+    if (activeSection === el.dataset.section) return
+    activeSection = el.dataset.section
+    renderPanel(); save()
+  }
+  if (act === 'dock') {
+    // Tapping the active dock item closes the sheet — the zero-chrome state.
+    if (sheetOpen && activeSection === el.dataset.section) { sheetOpen = false; render(); return }
+    const changed = activeSection !== el.dataset.section
+    activeSection = el.dataset.section
+    if (!sheetOpen) { sheetOpen = true; render() }
+    else if (changed) renderPanel()
+    save()
+  }
+})
+
+app.addEventListener('keydown', e => {
+  if (e.target.matches('[data-act="showLogo"]') && (e.key === ' ' || e.key === 'Enter')) {
+    e.preventDefault(); state.showLogo = !state.showLogo; sync(); save()
+  }
+})
+
+app.addEventListener('input', e => {
+  const el = e.target
+  if (el.dataset.act === 'title') { state.titleText = el.value; sync(); save() }
+  if (el.dataset.act === 'msg')   { state.messageText = el.value; sync(); save() }
+  // Clock fallback for non-keyboard input (paste, autofill, IME). Keyboard
+  // edits are handled in the keydown mask, which preventDefaults and so never
+  // reaches here.
+  if (el.dataset.bind === 'clock') {
+    const digits = el.value.replace(/\D/g, '').slice(0, 4).padEnd(4, '0')
+    commitClock(el, `${digits.slice(0,2)}:${digits.slice(2)}`, 5)
+  }
+})
+
+/* ── clock mask ───────────────────────────────────────────────────────────
+   Fixed 5-char "HH:MM": the colon lives at index 2 permanently and every
+   digit slot always holds a character, so the field can never reflow and the
+   caret hops over the colon. Condensed port of Settings.tsx's handler.      */
+app.addEventListener('keydown', e => {
+  const el = e.target
+  if (!el.matches('[data-bind="clock"]')) return
+  if (e.key === 'Enter') { el.blur(); return }
+  if (e.metaKey || e.ctrlKey || e.altKey) return
+
+  const start = el.selectionStart ?? 0
+  const end   = el.selectionEnd ?? start
+  const chars = clockInput.split('')
+  const clearSel = () => { for (let i = start; i < end; i++) if (i !== 2) chars[i] = '0' }
+
+  if (/^[0-9]$/.test(e.key)) {
+    e.preventDefault()
+    if (start !== end) clearSel()
+    let pos = start === 2 ? 3 : start
+    if (pos > 4) return
+    chars[pos] = e.key
+    let caret = pos + 1
+    if (caret === 2) caret = 3
+    commitClock(el, chars.join(''), caret)
+    return
+  }
+  if (e.key === 'Backspace') {
+    e.preventDefault()
+    if (start !== end) { clearSel(); commitClock(el, chars.join(''), start); return }
+    let t = start - 1
+    if (t === 2) t = 1
+    if (t < 0) return
+    chars[t] = '0'
+    commitClock(el, chars.join(''), t)
+    return
+  }
+  if (e.key === 'Delete') {
+    e.preventDefault()
+    if (start !== end) { clearSel(); commitClock(el, chars.join(''), start === 2 ? 3 : start); return }
+    const t = start === 2 ? 3 : start
+    if (t > 4) return
+    chars[t] = '0'
+    commitClock(el, chars.join(''), t)
+  }
+})
+function commitClock(el, next, caret) {
+  clockInput = next
+  el.value = next
+  el.setSelectionRange(caret, caret)
+  const mins = parseClock(next)
+  if (mins !== null) state.intervalMinutes = mins
+  sync(); save()
+}
+app.addEventListener('blur', e => {
+  if (!e.target.matches?.('[data-bind="clock"]')) return
+  const mins = parseClock(clockInput)
+  if (mins === null) {
+    const h = String(Math.floor(state.intervalMinutes / 60)).padStart(2, '0')
+    const m = String(state.intervalMinutes % 60).padStart(2, '0')
+    clockInput = `${h}:${m}`
+  }
+  sync()
+}, true)
+
+function pickIcon() {
+  const inp = document.createElement('input')
+  inp.type = 'file'; inp.accept = 'image/*'
+  inp.onchange = () => {
+    const f = inp.files?.[0]; if (!f) return
+    const r = new FileReader()
+    r.onload = () => { state.customIcon = r.result; sync(); save() }
+    r.readAsDataURL(f)
+  }
+  inp.click()
+}
+
+// Variant 6's Test. There is no second toast to spawn — the stage's toast IS
+// the real thing at the real position, so Test replays its lifecycle in place.
+//
+// WHY THERE IS AN EXIT AT ALL. Playing only the entrance felt abrupt, and the
+// abrupt part was not the entrance: `animation: <enter> both` puts the toast at
+// its from-state on frame 0, so the toast TELEPORTED off-stage and then slid
+// back. The hard cut was the departure. Adding a delay in front of the entrance
+// does not fix that — with fill-mode `both` the toast still vanishes instantly
+// and then you wait, which isolates the cut instead of removing it. So the exit
+// is animated too, and the delay becomes a HOLD between the two halves:
+//
+//   exit (200ms, shipped)  →  hold (tunable)  →  enter (400ms, shipped)
+//
+// which is a real notification lifecycle: dismissed, gone for a beat, arrives.
+// ~820ms total is well past the <300ms rule for UI response, and that is fine —
+// this is a rarely-pressed playback, not a UI reaction. The 200ms exit is
+// immediate feedback that the click landed.
+//
+// Removing the class and forcing a reflow before re-adding is what makes the
+// animation restartable; without the offsetWidth read the removal and addition
+// coalesce into one style update and nothing replays.
+let holdMs = 220
+let replaySeq = 0
+
+function replayToast(opts = {}) {
+  const t = app.querySelector('.v6-stage .toast, .v7-preview .toast')
+  if (!t) return
+  const seq = ++replaySeq          // invalidates any sequence still in flight
+  t.classList.remove('leaving', 'replay')
+  void t.offsetWidth
+
+  // Position changes get the entrance only. Running the full exit→hold→enter
+  // on every swatch click would make clicking through the six positions feel
+  // like wading; the toast has already visibly moved, so all it needs is to
+  // land again.
+  if (!opts.full) { t.classList.add('replay'); return }
+
+  t.classList.add('leaving')
+  const exitMs = parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--sip-exit-duration')) || 200
+  setTimeout(() => {
+    if (seq !== replaySeq || !t.isConnected) return
+    // Both class changes land in one task, so the settled state between them
+    // is never painted — no flash at the resting position mid-sequence.
+    t.classList.remove('leaving')
+    void t.offsetWidth
+    t.classList.add('replay')
+  }, exitMs + holdMs)
+}
+
+const toastLayer = $('#toasts')
+function testToast() {
+  if (toastLayer.children.length >= 3) toastLayer.firstElementChild.remove()
+  const wrap = document.createElement('div')
+  wrap.innerHTML = toastHTML()
+  const t = wrap.firstElementChild
+  syncToast(t)
+  t.querySelector('.toast-x').style.cursor = 'pointer'
+  t.querySelector('.toast-x').onclick = () => dismiss(t)
+  toastLayer.appendChild(t)
+  const timer = setTimeout(() => dismiss(t), 5000)
+  function dismiss(node) {
+    clearTimeout(timer)
+    node.classList.add('out')
+    node.addEventListener('animationend', () => node.remove(), { once: true })
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIT MEASUREMENT — the scoreboard for the thesis.
+   Walks the rendered tree for any element whose content is taller/wider than
+   its box. Because .app is a fixed-height, overflow-clipped flex tree, that is
+   exactly the condition the bento layout used to resolve by scrolling.
+   ═════════════════════════════════════════════════════════════════════════ */
+// Debounced past the 240ms panel/sheet entry animation. A transformed
+// descendant contributes to its ancestors' scrollable overflow area, so the
+// panel's translateY(4px) entry reads as a real 4px overflow if you measure
+// while it is still running — which is how this meter reported CLIPPED on
+// layouts that fit perfectly.
+let fitTimer
+function measureFit() {
+  clearTimeout(fitTimer)
+  fitTimer = setTimeout(() => {
+    let worst = 0, worstEl = null, intentional = 0
+    const all = app.querySelectorAll('*')
+    for (const el of all) {
+      // Form controls scroll their own value by design, and the toast title is
+      // deliberately ellipsised — neither is the layout failing to fit.
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') continue
+      // closest(), not hasAttribute(): data-nofit marks a SUBTREE whose overflow
+      // is deliberate. The clock's colon is the case that forced this — the
+      // nudge is a transform on a blockified flex item, so the span itself
+      // reports the overflow, not just its parent.
+      if (el.closest('[data-nofit]')) continue
+      // Variant 6 scrolls its control column on purpose. Counted and reported
+      // rather than silently ignored — the badge's job is to prove the STAGE
+      // never clips, and it would be dishonest to let a designed scroll region
+      // read the same as a layout that fits in one screen.
+      if (el.hasAttribute('data-scroll-ok')) {
+        if (el.scrollHeight - el.clientHeight > 1) intentional++
+        continue
+      }
+      const dy = el.scrollHeight - el.clientHeight
+      const dx = el.scrollWidth  - el.clientWidth
+      const d = Math.max(dy, dx)
+      if (d > worst) { worst = d; worstEl = el }
+    }
+    const ok = worst <= 1
+    const fit = $('#w-fit')
+    fit.dataset.ok = ok ? '1' : '0'
+    $('#w-fit-hd').textContent = ok ? 'FITS' : 'CLIPPED'
+    const r = stage.getBoundingClientRect()
+    const dims = `${Math.round(r.width)}×${Math.round(r.height)}`
+    $('#w-fit-sub').textContent = ok
+      ? `${dims} · ${intentional ? `${intentional} scroll region (by design)` : 'nothing clipped'}`
+      : `${dims} · ${Math.round(worst)}px over in .${(worstEl?.className || '?').toString().trim().split(/\s+/)[0] || 'node'}`
+  }, 300)
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEVICE FRAMES
+   ═════════════════════════════════════════════════════════════════════════ */
+const FRAMES = [
+  { id: 'fill',    label: 'Fill window' },
+  { id: '320x568', label: 'iPhone SE (320×568)',      w: 320,  h: 568 },
+  { id: '390x844', label: 'iPhone 14 (390×844)',      w: 390,  h: 844 },
+  { id: '430x932', label: 'iPhone Pro Max (430×932)', w: 430,  h: 932 },
+  { id: '744x1133',label: 'iPad mini (744×1133)',     w: 744,  h: 1133 },
+  { id: '820x1180',label: 'iPad Air (820×1180)',      w: 820,  h: 1180 },
+  { id: '1024x768',label: 'iPad landscape (1024×768)',w: 1024, h: 768 },
+  { id: '1280x720',label: 'Short laptop (1280×720)',  w: 1280, h: 720 },
+  { id: '1440x900',label: 'Laptop (1440×900)',        w: 1440, h: 900 },
+  { id: '1920x1080',label:'Desktop (1920×1080)',      w: 1920, h: 1080 },
+  { id: '400x600', label: 'Extension popup-ish (400×600)', w: 400, h: 600 },
+]
+let frameId = 'fill'
+const frameEl = $('#frame')
+
+function applyFrame() {
+  const f = FRAMES.find(x => x.id === frameId) || FRAMES[0]
+  if (!f.w) {
+    frameEl.dataset.mode = 'fill'
+    stage.style.width = stage.style.height = ''
+    stage.style.transform = ''
+  } else {
+    frameEl.dataset.mode = 'preset'
+    const availW = window.innerWidth  - 56
+    const availH = window.innerHeight - 56
+    const scale = Math.min(1, availW / f.w, availH / f.h)
+    stage.style.width  = f.w + 'px'
+    stage.style.height = f.h + 'px'
+    // Visual scale only — layout still happens at the device's real px, so
+    // container queries and cqh units stay truthful.
+    stage.style.transform = scale < 1 ? `scale(${scale})` : ''
+  }
+  measureFit()
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WIDGET
+   ═════════════════════════════════════════════════════════════════════════ */
+const VARIANT_META = [
+  { n: 1, name: 'Segmented',       note: 'preview + centred tabs' },
+  { n: 2, name: 'Rail / Tab bar',  note: 'rail ⇄ bottom bar' },
+  { n: 3, name: 'Inspector split', note: 'canvas + docked panel' },
+  { n: 4, name: 'Control dock',    note: 'hero preview, summoned sheet' },
+  { n: 5, name: 'Adaptive',        note: 'all-at-once ⇄ tabs' },
+  { n: 6, name: 'Editor',          note: 'controls left, stage right' },
+  { n: 7, name: 'The design',      note: 'Paper export + dark mode + modal' },
+]
+const widget = $('#widget')
+
+$('#w-variants').innerHTML = VARIANT_META.map(v => `
+  <button class="w-btn" data-wvariant="${v.n}" aria-pressed="false" title="${v.note}">
+    <span class="k">${v.n}</span><span>${v.name}</span>
+  </button>`).join('')
+
+$('#w-frame').innerHTML = FRAMES.map(f => `<option value="${f.id}">${f.label}</option>`).join('')
+
+$('#w-themes').innerHTML = ['system','light','dark'].map(t => `
+  <button class="w-btn" data-wtheme="${t}" aria-pressed="false">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')
+
+$('#w-variants').addEventListener('click', e => {
+  const b = e.target.closest('[data-wvariant]'); if (!b) return
+  setVariant(+b.dataset.wvariant)
+})
+$('#w-themes').addEventListener('click', e => {
+  const b = e.target.closest('[data-wtheme]'); if (!b) return
+  setTheme(b.dataset.wtheme)
+})
+$('#w-frame').addEventListener('change', e => { frameId = e.target.value; applyFrame(); render(); save() })
+$('#w-collapse').addEventListener('click', () => { widget.classList.toggle('collapsed'); save() })
+$('#w-hide').addEventListener('click', () => hideWidget(true))
+$('#w-show').addEventListener('click', () => hideWidget(false))
+
+function hideWidget(hide) {
+  widget.classList.toggle('hidden', hide)
+  $('#w-show').classList.toggle('on', hide)
+  save()
+}
+$('#w-test').addEventListener('click', () => { showTest = !showTest; syncWidget(); render(); save() })
+
+// 0 is the "before" case for comparison — exit straight into enter, no beat.
+const HOLDS = [0, 150, 220, 320]
+$('#w-hold').innerHTML = HOLDS.map(h =>
+  `<button class="w-btn" data-whold="${h}" aria-pressed="false">${h || 'none'}</button>`).join('')
+$('#w-hold').addEventListener('click', e => {
+  const b = e.target.closest('[data-whold]'); if (!b) return
+  holdMs = +b.dataset.whold
+  syncWidget(); save()
+  replayToast({ full: true })   // play it immediately so the value is audible, so to speak
+})
+
+// The Test-button toggle only means anything in variant 6, so it only appears
+// there — the widget should not offer a control that does nothing.
+function syncWidget() {
+  $$('[data-wvariant]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.wvariant === variant)))
+  $('#w-v6opts').hidden = variant !== 6
+  $('#w-test').setAttribute('aria-pressed', String(showTest))
+  $$('[data-whold]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.whold === holdMs)))
+}
+
+function setVariant(n) {
+  variant = n
+  modalOpen = false
+  if (n === 4) sheetOpen = true
+  syncWidget()
+  render(); save()
+}
+
+/* ── drag ─────────────────────────────────────────────────────────────────
+   Pointer events (not mouse) so it works with trackpad, touch and pen alike.
+   Position is clamped into the viewport on drop AND on resize, so the widget
+   can never end up parked off-screen with no way back.                      */
+let drag = null
+$('#w-head').addEventListener('pointerdown', e => {
+  if (e.target.closest('button')) return
+  const r = widget.getBoundingClientRect()
+  drag = { dx: e.clientX - r.left, dy: e.clientY - r.top }
+  widget.classList.add('dragging')
+  $('#w-head').setPointerCapture(e.pointerId)
+  e.preventDefault()
+})
+$('#w-head').addEventListener('pointermove', e => {
+  if (!drag) return
+  placeWidget(e.clientX - drag.dx, e.clientY - drag.dy)
+})
+$('#w-head').addEventListener('pointerup', e => {
+  if (!drag) return
+  drag = null
+  widget.classList.remove('dragging')
+  $('#w-head').releasePointerCapture(e.pointerId)
+  save()
+})
+function placeWidget(x, y) {
+  const r = widget.getBoundingClientRect()
+  const maxX = window.innerWidth  - r.width  - 8
+  const maxY = window.innerHeight - r.height - 8
+  const nx = Math.max(8, Math.min(x, Math.max(8, maxX)))
+  const ny = Math.max(8, Math.min(y, Math.max(8, maxY)))
+  widget.style.left = nx + 'px'
+  widget.style.top  = ny + 'px'
+  widget.style.right = widget.style.bottom = 'auto'
+}
+
+/* ── keyboard ─────────────────────────────────────────────────────────────
+   Ignored while a text field has focus, so typing "3" into the clock does not
+   jump variants.                                                            */
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return
+  const t = e.target
+  if (t.matches?.('input, textarea, select')) return
+  if (e.key === 'Escape' && modalOpen) { modalOpen = false; render(); return }
+  if (/^[1-7]$/.test(e.key)) { setVariant(+e.key); return }
+  if (e.key === 't' && variant === 6) { showTest = !showTest; syncWidget(); render(); save(); return }
+  if (e.key === '[' || e.key === ']') {
+    const i = FRAMES.findIndex(f => f.id === frameId)
+    const next = (i + (e.key === ']' ? 1 : -1) + FRAMES.length) % FRAMES.length
+    frameId = FRAMES[next].id
+    $('#w-frame').value = frameId
+    applyFrame(); render(); save()
+    return
+  }
+  if (e.key === 'd') { setTheme(isDark() ? 'light' : 'dark'); return }
+  if (e.key === 'h') { hideWidget(!widget.classList.contains('hidden')) }
+})
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PERSISTENCE
+   ═════════════════════════════════════════════════════════════════════════ */
+const KEY = 'sip-proto-layouts'
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({
+      state, clockInput, activeSection, variant, sheetOpen, frameId,
+      toastPosition, showTest, holdMs,
+      widget: {
+        left: widget.style.left, top: widget.style.top,
+        collapsed: widget.classList.contains('collapsed'),
+        hidden: widget.classList.contains('hidden'),
+      },
+    }))
+  } catch {}
+}
+function load() {
+  let d = null
+  try { d = JSON.parse(localStorage.getItem(KEY) || 'null') } catch {}
+  if (!d) return
+  Object.assign(state, d.state || {})
+  if (d.clockInput) clockInput = d.clockInput
+  if (d.activeSection) activeSection = d.activeSection
+  if (d.variant) variant = d.variant
+  if (typeof d.sheetOpen === 'boolean') sheetOpen = d.sheetOpen
+  if (typeof d.showTest === 'boolean') showTest = d.showTest
+  if (HOLDS.includes(d.holdMs)) holdMs = d.holdMs
+  if (d.toastPosition && POSITIONS.includes(d.toastPosition)) toastPosition = d.toastPosition
+  if (d.frameId && FRAMES.some(f => f.id === d.frameId)) frameId = d.frameId
+  const w = d.widget || {}
+  if (w.left && w.top) { widget.style.left = w.left; widget.style.top = w.top; widget.style.right = widget.style.bottom = 'auto' }
+  widget.classList.toggle('collapsed', !!w.collapsed)
+  hideWidget(!!w.hidden)
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT
+   ═════════════════════════════════════════════════════════════════════════ */
+load()
+applyTheme()
+$('#w-frame').value = frameId
+syncWidget()
+
+// Default position: bottom-left, out of the way of every variant's content.
+// On a phone-sized window the expanded panel would cover most of the layout
+// under test, so it starts collapsed there — one click to open, still draggable.
+if (!widget.style.left) {
+  if (window.innerWidth < 620) widget.classList.add('collapsed')
+  widget.style.left = '16px'
+  widget.style.top  = (window.innerHeight - widget.offsetHeight - 16) + 'px'
+}
+
+applyFrame()
+render()
+
+// Variant 5 re-renders when the container crosses its own roomy/compact line;
+// every variant re-measures fit on any resize.
+let lastRoomy = v5Roomy()
+new ResizeObserver(() => {
+  const roomy = v5Roomy()
+  if (variant === 5 && roomy !== lastRoomy) { lastRoomy = roomy; render() }
+  else { syncScrollHint(); measureFit() }
+}).observe(stage)
+
+window.addEventListener('resize', () => {
+  applyFrame()
+  // Re-clamp so shrinking the window can never strand the widget off-screen.
+  if (widget.classList.contains('hidden')) return
+  const r = widget.getBoundingClientRect()
+  placeWidget(r.left, r.top)
+})
+</script>
+</body>
+</html>

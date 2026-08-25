@@ -1,47 +1,22 @@
 'use client'
 
-// Web-only "Info" modal, opened from the top-nav Info link. Header mirrors the
-// app/extension top nav (ThemedLogo + gradient wordmark + × close); open/close
-// animation follows the shared modal recipe (m-trak design-notes): 160ms in /
-// 130ms out, scale 0.94 ↔ 1, easeOutCubic — CSS lives in globals.css.
+// Web-only "Info" modal, opened from the top-nav Info link. v2 replaces the
+// brand-row header with a plain "Information" title — the modal no longer has
+// to re-announce the app it is already inside. Open/close animation is
+// unchanged (160ms in / 130ms out, scale 0.94 ↔ 1, easeOutCubic; CSS in
+// globals.css).
 
-import { useEffect, useState, type ReactNode } from 'react'
-import { ThemedLogo, XIcon } from '@sip/ui'
-import { webPlatform } from '../platform'
+import { useEffect, type ReactNode } from 'react'
+import { XIcon } from '@sip/ui'
 import { useModalClose } from '../hooks/useModalClose'
 import { CHROME_STORE_URL } from '../links'
-
-// Resolved theme for the stacked-logo crossfade: explicit data-theme wins,
-// otherwise system preference. Mirrors Settings' resolveIsDark, but tracked
-// via observer since the modal doesn't own prefs state.
-function useIsDark() {
-  const [dark, setDark] = useState(() => {
-    const t = document.documentElement.getAttribute('data-theme')
-    return t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
-
-  useEffect(() => {
-    const html = document.documentElement
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const compute = () => {
-      const t = html.getAttribute('data-theme')
-      setDark(t ? t === 'dark' : mq.matches)
-    }
-    const mo = new MutationObserver(compute)
-    mo.observe(html, { attributes: true, attributeFilter: ['data-theme'] })
-    mq.addEventListener('change', compute)
-    return () => { mo.disconnect(); mq.removeEventListener('change', compute) }
-  }, [])
-
-  return dark
-}
 
 // Icon + label + arrow row. Same hover treatment as the top-nav links
 // (tertiary → secondary, transition-colors); currentColor lets the icons
 // transition in lockstep with the text. href → anchor, else button — same
 // no-dead-anchor convention as NavLinks.
 function LinkRow({ href, icon, children }: { href?: string; icon: ReactNode; children: string }) {
-  const cls = 'cursor-pointer flex items-center gap-2 bg-transparent border-0 p-0 appearance-none outline-none no-underline text-md font-medium text-text-tertiary hover:text-text-secondary transition-colors'
+  const cls = 'cursor-pointer flex items-center gap-2 bg-transparent border-0 p-0 appearance-none outline-none no-underline text-[15px] leading-[1.5] font-semibold text-text-label hover:text-text-strong transition-colors'
   const content = (
     <>
       {icon}
@@ -58,7 +33,6 @@ function LinkRow({ href, icon, children }: { href?: string; icon: ReactNode; chi
 
 export default function InfoModal({ onClose }: { onClose: () => void }) {
   const { closing, close } = useModalClose()
-  const dark = useIsDark()
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close(onClose) }
@@ -94,24 +68,21 @@ export default function InfoModal({ onClose }: { onClose: () => void }) {
              pushed the header — and the close button with it — 37px above the top
              of the screen with no way to reach it. Both are inert whenever the
              design size fits, so desktop is unchanged. */
-        className={`info-modal${closing ? ' info-modal--closing' : ''} bg-surface-base border-0.5 border-border-default rounded-[24px] p-gap-lg box-border w-[650px] max-w-[calc(100vw-48px)] h-[450px] max-h-[calc(100dvh-48px)] flex flex-col justify-between overflow-y-auto`}
+        /* 650×314 is the design size, but height is a MINIMUM, not a mandate:
+           at a fixed height the copy overflows as soon as the modal narrows and
+           the paragraph wraps to more lines. max-h + overflow keep the header
+           (and its close button) reachable on a landscape phone.
+           bg-surface-modal is its own token: white in light (the modal reads
+           as a lifted plane, with the border and shadow doing the separating)
+           and #1F2023 in dark. No existing token had that pair, and a `dark:`
+           variant would not work here — this config scopes dark: to an explicit
+           [data-theme="dark"], so it silently misses `theme: 'system'` users. */
+        className={`info-modal${closing ? ' info-modal--closing' : ''} bg-surface-modal rounded-3xl p-gap-lg box-border w-[650px] max-w-[calc(100vw-48px)] min-h-[314px] max-h-[calc(100dvh-48px)] flex flex-col justify-between gap-gap-lg overflow-y-auto`}
         onMouseDown={e => e.stopPropagation()}
       >
-        {/* ── header: brand row identical to the app top nav ── */}
+        {/* ── header ── */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ThemedLogo platform={webPlatform} size={24} assetSize={64} dark={dark} />
-            <span
-              className="font-medium text-transparent bg-clip-text"
-              style={{
-                fontSize: 14,
-                lineHeight: '18px',
-                backgroundImage: 'linear-gradient(in oklab 180deg, oklab(75% -0.113 -0.049) 0%, oklab(53.6% -0.009 -0.212) 100%)',
-              }}
-            >
-              Sip Hydra
-            </span>
-          </div>
+          <span className="text-[18px] leading-[1.5] font-semibold text-text-strong">Information</span>
           <button
             onClick={() => close(onClose)}
             aria-label="Close"
@@ -122,17 +93,14 @@ export default function InfoModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* ── body: about + links ── */}
-        <div className="flex flex-col items-start gap-16 self-stretch">
-          <div className="flex flex-col items-start gap-2 self-stretch">
-            <span className="text-md font-medium text-text-secondary">About</span>
-            <p className="m-0 self-stretch text-md font-medium text-text-muted">
-              I created Sip because I am notoriously bad at remembering to hydrate while
-              working on my computer. This Chrome extension helped me fix that, no matter
-              how locked in I can get. I hope it can help you out as well.
-            </p>
-          </div>
+        <div className="flex flex-col items-start gap-8 self-stretch">
+          <p className="m-0 self-stretch text-[15px] leading-[1.5] font-medium text-text-muted">
+            I created Sip because I am notoriously bad at remembering to hydrate while
+            working on my computer. This Chrome extension helped me fix that, no matter
+            how locked in I can get. I hope it can help you out as well.
+          </p>
 
-          <div className="flex flex-col items-start gap-xs">
+          <div className="flex flex-col items-start gap-1">
             <LinkRow href={CHROME_STORE_URL} icon={<ChromeIcon />}>Download</LinkRow>
             <LinkRow href="https://github.com/mihxlko/sip" icon={<GitHubIcon />}>Code</LinkRow>
           </div>
@@ -144,15 +112,15 @@ export default function InfoModal({ onClose }: { onClose: () => void }) {
             href="https://www.mihalko.us/"
             target="_blank"
             rel="noopener noreferrer"
-            className="no-underline text-md font-medium text-text-muted hover:text-text-secondary transition-colors"
+            className="no-underline text-[15px] leading-[1.5] font-medium text-text-muted hover:text-text-secondary transition-colors"
           >
             mihalko.us
           </a>
           <div className="flex items-center gap-2">
-            <span className="text-md font-medium text-text-muted">
+            <span className="text-[15px] leading-[1.5] font-medium text-text-muted">
               v{process.env.NEXT_PUBLIC_APP_VERSION}
             </span>
-            <span className="text-md font-medium text-text-muted">©2026</span>
+            <span className="text-[15px] leading-[1.5] font-medium text-text-muted">©2026</span>
           </div>
         </div>
       </div>

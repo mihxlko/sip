@@ -1,6 +1,13 @@
 /* ─── SIP toast styles ── self-contained, no @import ──────────────────────────
    Tokens are inlined here (no @import) so a single ?inline import captures
    everything — CRXJS's CSS pipeline drops chained ?inline imports.
+
+   WARNING: this inlined copy is a SHADOW of tokens.css, and both settings
+   entrypoints import it AFTER tokens.css — so any value that drifts here
+   silently wins for the WHOLE PAGE, not just the toast. v2 hit exactly that:
+   --surface-base stayed #FBFBFB here and overrode the new white page. Keep the
+   shared semantic names in step, or narrow this block to only what the toast
+   actually needs.
    ─────────────────────────────────────────────────────────────────────────── */
 
 :root,
@@ -11,6 +18,7 @@
   --black: #000000;
 
   --neutral-03:  #FBFBFB;
+  --neutral-25:  #F8F8F9;
   --neutral-50:  #F1F1F2;
   --neutral-75:  #EAEAEC;
   --neutral-100: #E3E3E5;
@@ -23,7 +31,7 @@
   --neutral-650: #4F5159;
   --neutral-700: #44454C;
   --neutral-750: #333439;
-  --neutral-800: #313137;
+  --neutral-800: #323338;  /* was #313137 — drifted from tokens.css */
   --neutral-825: #2A2B30;
   --neutral-850: #28282C;
   --neutral-875: #252529;
@@ -57,10 +65,10 @@
   --bottle-purple: #B938F6;
 
   /* ── semantic: surfaces (light defaults) ───────────────────────────── */
+  --surface-base:     var(--white);
   --surface-elevated: var(--white);
   --surface-raised:   var(--white);
   --surface-primary:  var(--white);
-  --surface-base:     var(--neutral-03);
 
   /* ── semantic: text (light defaults) ───────────────────────────────── */
   --text-primary:   var(--neutral-800);
@@ -90,7 +98,7 @@
   --text-sm: 13px;
   --text-md: 15px;
   --text-lg: 17px;
-  --text-xl: 60px;
+  --text-xl: 80px;  /* was 60px — drifted from tokens.css */
 
   --font-medium:   500;
   --font-semibold: 600;
@@ -153,10 +161,10 @@
 
 [data-theme="dark"],
 :host([data-theme="dark"]) {
+  --surface-base:     var(--neutral-997);
   --surface-elevated: var(--neutral-800);
   --surface-raised:   var(--neutral-850);
   --surface-primary:  var(--neutral-900);
-  --surface-base:     var(--neutral-950);
 
   --text-primary:   var(--neutral-50);
   --text-secondary: var(--neutral-150);
@@ -181,10 +189,10 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
+    --surface-base:     var(--neutral-997);
     --surface-elevated: var(--neutral-800);
     --surface-raised:   var(--neutral-850);
     --surface-primary:  var(--neutral-900);
-    --surface-base:     var(--neutral-950);
 
     --text-primary:   var(--neutral-50);
     --text-secondary: var(--neutral-150);
@@ -277,6 +285,11 @@
    Maps: w-[450px] bg-surface-elevated border-0.5 border-border-default
          rounded-xl shadow p-pad-xl flex flex-col overflow-clip font-sans antialiased
    ─────────────────────────────────────────────────────────────────────────── */
+/* Settings' decorative preview renders this very component so the two can
+   never drift — but inside the preview pane it has to fit rather than force a
+   450px floor. Scoped to the wrapper so the live toast is untouched. */
+.sip-toast-preview .sip-toast { width: min(450px, 100%); }
+
 .sip-toast {
   width: 450px;
   background-color: var(--surface-elevated);
@@ -356,18 +369,8 @@
 
 /* badge / logo wrapper
    Maps: shrink-0 mb-0.5                                                      */
-.sip-toast-badge {
-  flex-shrink: 0;
-}
-
 /* custom icon img inside badge
    Maps: block rounded-md object-cover                                        */
-.sip-toast-badge-img {
-  display: block;
-  border-radius: var(--radius-md);
-  object-fit: cover;
-}
-
 /* message paragraph
    Maps: m-0 w-[350px] text-text-muted text-sm font-medium leading-[16px]   */
 .sip-toast-message {

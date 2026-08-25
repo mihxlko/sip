@@ -12,36 +12,17 @@ export default {
     extend: {
 
       // ─── breakpoints ───────────────────────────────────────────────────────
-      // Two breakpoints, both derived — neither picked off a device table.
+      // `narrow` is the v2 editor's only layout breakpoint. The control column
+      // is a rigid 290px and the preview absorbs every pixel of horizontal
+      // shrink: 290 + 8 gap + 32 gutter = 330 fixed, and the preview stops
+      // showing a legible toast below ~320. 660 is where the preview has
+      // finished shrinking and the layout has to stack instead.
       //
-      // `wide` is the card layout's. The settings column is capped at 872px and
-      // the bottom row's two columns can't shrink below it (250px bottle preview
-      // + fixed-width right column). 872 + 24px gutter × 2 = 920 is therefore the
-      // exact width at which the desktop layout stops fitting.
-      //   < wide  → single column, all five cards stacked
-      //   ≥ wide  → the full two-column layout, untouched
-      //
-      // `dock` is the top nav's own breakpoint, and it is TWO disjoint ranges in
-      // one variant (Tailwind emits them as a single comma-separated media query).
-      // The nav floats transparently over the page while its brand/links clusters
-      // clear the centred card column, and docks into a filled bar where they'd
-      // otherwise sit over a card as it scrolls under. Measured clearances, at a
-      // 24px minimum:
-      //   ≥ 1159      float  — 872px column, clearance grows with the viewport
-      //   920 – 1158  DOCK   — clusters overrun the 872px column (−95px at 921)
-      //   737 – 919   float  — cards restack to 450px, clearance jumps back to 120
-      //   ≤ 736       DOCK   — clusters overrun the 450px column
-      // The 920 edge is shared with the card restack, so that flip reads as one
-      // event; 1159 and 736 are the nav's own. Re-derive all three if the brand
-      // wordmark or the nav links change width.
-      // `dock-doc` is /privacy's equivalent. Web-only (the extension has no such
-      // page), and a single range rather than two: that page's column is capped
-      // at 700px and never restacks, so there's no island — it just collides
-      // below 977 and stays collided. Its brand cluster binds, where the app
-      // nav's links cluster does, hence the different number.
+      // `dock-doc` is /privacy's own, and unrelated: that page still has a
+      // docked nav, its column is capped at 700px and never restacks, so it
+      // simply collides below 977 and stays collided.
       screens: {
-        wide: '920px',
-        dock: [{ min: '920px', max: '1158px' }, { max: '736px' }],
+        narrow: { max: '659px' },
         'dock-doc': { max: '976px' },
       },
 
@@ -54,6 +35,13 @@ export default {
         'surface-raised':   'var(--surface-raised)',
         'surface-primary':  'var(--surface-primary)',
         'surface-base':     'var(--surface-base)',
+        // v2 editor surfaces. Page and field share a value; card sits one step
+        // away from it (darker in light, lighter in dark).
+        'surface-card':     'var(--surface-card)',
+        'surface-modal':    'var(--surface-modal)',
+        'surface-field':    'var(--surface-field)',
+        'surface-selected': 'var(--surface-selected)',
+        'surface-action':   'var(--surface-action)',
 
         // text  (use these instead of raw neutrals to get theme switching)
         'text-primary':   'var(--text-primary)',
@@ -62,12 +50,17 @@ export default {
         'text-muted':     'var(--text-muted)',
         'text-error':     'var(--text-error)',
         'text-brand':     'var(--text-brand)',
+        'text-strong':    'var(--text-strong)',
+        'text-label':     'var(--text-label)',
+        'text-action':    'var(--text-action)',
 
         // borders  (class: border-border-default, border-border-strong, etc.)
         'border-default':  'var(--border-default)',
         'border-strong':   'var(--border-strong)',
         'border-emphasis': 'var(--border-emphasis)',
         'border-focus':    'var(--border-focus)',
+        'border-field':    'var(--border-field)',
+        'border-selected': 'var(--border-selected)',
 
         // interaction overlays  (class: bg-state-hover, etc.)
         'state-hover':    'var(--state-hover)',
@@ -158,6 +151,10 @@ export default {
         lg:  'var(--radius-lg)',  // 10px  main app cards
         xl:  'var(--radius-xl)',  // 16px  notification toast
         xxl: 'var(--radius-xxl)', // 20px  main app overlay
+        // v2. `chip` is off-scale on purpose — 18px is the one value the
+        // design uses that no existing step covers.
+        chip: 'var(--radius-chip)', // 18px  type chip, clock well
+        '3xl': 'var(--radius-3xl)', // 24px  cards, preview pane, Test
       },
 
       // ─── shadows ───────────────────────────────────────────────────────────
