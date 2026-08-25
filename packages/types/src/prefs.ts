@@ -15,14 +15,16 @@ export enum BottleColor {
 
 export type Theme = 'system' | 'light' | 'dark'
 
+// v2 removed `customIcon` and `showLogo` along with the Settings "Icon" card —
+// the logo beside the toast title is gone from the design. Existing stored
+// prefs may still carry those keys; they spread through getPrefs() harmlessly
+// and are simply never read, so no migration is required.
 export interface SipPrefs {
   bottleType:      BottleType
   bottleColor:     BottleColor
   titleText:       string       // max 100 chars
   messageText:     string       // max 120 chars
   intervalMinutes: number
-  customIcon:      string | null // base64 data-URL, or null to use the default SIP logo
-  showLogo:        boolean
   theme:           Theme
 }
 
@@ -32,8 +34,6 @@ export const DEFAULT_PREFS: Readonly<SipPrefs> = {
   titleText:       'Drink Up!',
   messageText:     'Sending you a friendly reminder to drink some water.',
   intervalMinutes: 15,
-  customIcon:      null,
-  showLogo:        true,
   theme:           'system',
 }
 

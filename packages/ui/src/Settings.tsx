@@ -24,10 +24,15 @@ const TYPE_ORDER: BottleType[] = [BottleType.Classic, BottleType.Wide, BottleTyp
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function resolveIsDark(theme: SipPrefs['theme']): boolean {
-  if (theme === 'dark')  return true
-  if (theme === 'light') return false
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
+// "1 Hour 30 Minutes" / "15 Minutes" / "2 Hours". Singular/plural per unit, and
+// a zero unit is dropped entirely rather than printed as "0 Hours".
+function intervalWords(total: number): string {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  const parts: string[] = []
+  if (h) parts.push(`${h} ${h === 1 ? 'Hour' : 'Hours'}`)
+  if (m) parts.push(`${m} ${m === 1 ? 'Minute' : 'Minutes'}`)
+  return parts.join(' ') || '0 Minutes'
 }
 
 // ─── settings ────────────────────────────────────────────────────────────────
@@ -266,412 +271,349 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
     ), { duration: 8000 })
   }
 
-  function pickIcon() {
-    const inp = document.createElement('input')
-    inp.type = 'file'
-    inp.accept = 'image/*'
-    inp.onchange = () => {
-      const file = inp.files?.[0]
-      if (!file) return
-      const reader = new FileReader()
-      reader.onload = () => update({ customIcon: reader.result as string })
-      reader.readAsDataURL(file)
-    }
-    inp.click()
-  }
-
-  const dark  = resolveIsDark(prefs.theme)
-
   return (
     <>
+    {/* Test fires a REAL toast here, top-right, through the same Sonner
+        pipeline the extension uses. The preview in the pane below is
+        decoration — it never animates and never moves. */}
     <Toaster
       position="top-right"
       offset="16px"
       visibleToasts={3}
       toastOptions={{ unstyled: true }}
     />
-    {/* content root */}
-    {/* dock:pt-[68px] clears the docked bar. The bar is 64 tall (20 top pad +
-        24 items + 20 bottom pad) and the cards should sit a gap-lg below it, so
-        content starts at 88 — minus the 20 the shells contribute above this
-        element = 68. Floating, the cards stay flush at 44 as before. */}
-    <div
-      className="relative w-full font-sans antialiased flex flex-col gap-gap-lg bg-surface-base p-gap-lg dock:pt-[68px]"
-    >
 
-        {/* ── header ── */}
-        {/* Viewport-fixed nav: the brand and right-side actions stay put while
-            the page scrolls beneath them. No background band — cards must reach
-            the viewport top edge uncovered (no-horizontal-scroll / no-band rule,
-            see design-docs.md). pointer-events-none lets clicks and scrolls pass
-            through everywhere except the interactive right cluster. The inner
-            container mirrors both app shells (max-w 2240, centered) and stretches
-            edge to edge, so the brand and the actions sit on the same 24px gutter
-            as the cards below at every width — including the stacked breakpoint,
-            where nav and card share one left/right edge. */}
-        {/* The nav stays `fixed` in BOTH states — "docked" is a fill plus a
-            content offset, not a change of positioning. Going in-flow would make
-            the bar reserve its own space, so the shells' compensating padding
-            would have to be unwound in exactly the `dock` ranges and the content
-            would jump at every boundary. Same look, far less to get wrong.
-            The scrim is 80% --surface-base + blur, so at scroll-0 it sits on the
-            page background and is invisible: the bar only materialises once a
-            card scrolls under it, which is the only moment it's needed.
-            pointer-events-auto comes back with the fill — a visible bar that
-            passes clicks through to the cards beneath reads as broken. */}
-        <div className="fixed top-0 left-0 right-0 z-10 pointer-events-none dock:pointer-events-auto dock:bg-[var(--surface-nav-scrim)] dock:backdrop-blur-md">
-          <div className="w-full max-w-[2240px] mx-auto box-border px-gap-lg pt-pad-xl dock:pb-pad-xl flex items-center justify-between">
-          {/* brand — identical on web and extension */}
-          <div className="flex items-center gap-2">
-            <ThemedLogo platform={platform} size={24} assetSize={64} dark={dark} />
-            {/* 14px/18px — between text-sm (13) and text-md (15), no token.
-                Wordmark gradient colors exist only in the design, not tokens.css. */}
-            <span
-              className="font-medium text-transparent bg-clip-text"
-              style={{
-                fontSize: 14,
-                lineHeight: '18px',
-                backgroundImage: 'linear-gradient(in oklab 180deg, oklab(75% -0.113 -0.049) 0%, oklab(53.6% -0.009 -0.212) 100%)',
-              }}
-            >
-              Sip Hydra
-            </span>
-          </div>
-          <div className="pointer-events-auto">
-            {headerRight ?? (
-              <button
-                onClick={onClose}
-                aria-label="Close"
-                className="cursor-pointer text-text-muted hover:text-text-secondary transition-colors bg-transparent border-0 p-0 outline-none leading-none appearance-none"
-              >
-                {/* 11 ≈ 15 scaled by the logo's 32→24 reduction */}
-                <XIcon size={11} />
-              </button>
-            )}
-          </div>
-          </div>
-        </div>
+    {/* Fixed-height flex tree, not a flowing page. That is what pins the
+        preview: the only element that scrolls is the control column, so the
+        toast can never be scrolled off screen — the whole point of the
+        editor layout. */}
+    <div className="h-[100dvh] w-full flex flex-col font-sans antialiased bg-surface-base text-text-primary">
 
-        {/* ── settings-controls: preview + bottom-controls ── */}
-        {/* Two caps, one per layout. 872 is the two-column width. 450 is the
-            stacked one, and it's the toast's existing max-width — reused rather
-            than invented, so the preview card, the toast inside it and every
-            stacked card below share one left/right edge.
-            Without the 450 cap the column would run to 872 just under the
-            breakpoint, and the cards' justify-between rows (3 type thumbs, 6
-            swatches) would fling their items to opposite ends of an 850px card.
-            Below 450 the cap is inert and the cards simply fill the gutter. */}
-        <div className="w-full max-w-[450px] wide:max-w-[872px] mx-auto flex flex-col gap-gap-lg">
-
-        {/* ── preview panel ── */}
-        {/* px-gap-lg below `wide`: the panel exists to frame the toast, and once
-            the column is capped at 450 the toast's own max-w-[450px] would fill it
-            edge to edge and the frame would read as an accident. 24px matches the
-            panel's own pb-gap-lg. At `wide` the 872px panel already has room. */}
-        <div className="bg-surface-primary rounded-xxl shadow border-0.5 border-border-default flex flex-col items-center gap-gap-xl overflow-clip pt-gap-xxl pb-gap-lg px-gap-lg wide:px-0">
-          <ToastPreview platform={platform} prefs={prefs} dark={dark} />
-          {/* Test button: rounded-full = design's 25px radius — no exact token */}
-          <button
-            onClick={testToast}
-            className="btn-press cursor-pointer bg-surface-elevated border-0.5 border-border-emphasis rounded-full shadow-subtle px-gap-md py-xs text-sm font-semibold text-text-secondary appearance-none outline-none hover:bg-[image:linear-gradient(var(--state-hover),var(--state-hover))] hover:text-text-primary"
+      {/* ── nav ── */}
+      <div className="flex-none flex items-center justify-between gap-3 py-4 px-8 narrow:py-3 narrow:px-4">
+        <div className="flex items-center gap-2">
+          <SipMark />
+          {/* Icon-only once the nav is competing with the links for a 320px
+              line — the mark carries the brand on its own. */}
+          <span
+            className="narrow:hidden font-semibold text-transparent bg-clip-text text-[16px] narrow:text-[14px] leading-[1.25] tracking-normal"
+            style={{
+              backgroundImage: 'linear-gradient(in oklab 180deg, oklab(75% -0.113 -0.049) 0%, oklab(53.6% -0.009 -0.212) 100%)',
+            }}
           >
-            Test
-          </button>
+            Sip Hydra
+          </span>
         </div>
 
-        {/* ── bottom-controls: bottle | bottom-right-controls ── */}
-        {/* Below `wide` this is the single stacking column for ALL five cards.
-            The two grouping wrappers below (bottom-right-controls, bottom-right-row)
-            go `display: contents`, which drops them out of the box tree and promotes
-            their cards to direct flex children here. That's what makes the stack
-            order fall out of the existing DOM order for free — Bottle, Text, Time,
-            Icon, Appearance — with no duplicated markup, no JSX reordering and one
-            `gap-gap-lg` governing all five. At `wide` the wrappers become boxes
-            again and the original two-column layout is restored untouched. */}
-        <div className="flex flex-col gap-gap-lg wide:flex-row wide:items-stretch">
+        {headerRight ?? (
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="cursor-pointer text-text-muted hover:text-text-secondary transition-colors bg-transparent border-0 p-0 outline-none leading-none appearance-none"
+          >
+            <XIcon size={12} />
+          </button>
+        )}
+      </div>
 
-          {/* bottle card — wide:flex-1: takes leftover space after the content-sized
-              right column. Only at `wide`: in the stacked column `flex-1` would
-              resolve against the main axis and stretch the card vertically. */}
-          <div className="wide:flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-md">
-            <span className="text-text-secondary text-md font-medium px-[8px]">Bottle</span>
+      {/* ── body ──
+          DOM order is [preview, controls] and the row is REVERSED, so the
+          preview lands on the right on desktop and on top when stacked. One
+          property flips (row-reverse → column); nothing is duplicated.
 
-            {/* large preview — 250 wide × 230 tall, no inner padding. (It used to
-                carry `p-space-padding-xl`, which is not a class this config can
-                generate — the spacing keys are `pad-*`, not `space-padding-*` — so
-                no padding was ever applied and the comment claiming 50px was
-                describing an intent that never shipped. Removed rather than
-                corrected to `p-pad-xxl`: the image is 200 tall in a 230 box, so
-                real 50px padding would squeeze it.)
-                250 is a hard width only inside the two-column row (where the card's
-                content box is 251 — i.e. it already fills it). Stacked, the card is
-                as wide as the viewport, so the preview fills it too: w-full keeps it
-                flush with the Type/Color rows below instead of stranding ~45px of
-                dead space, and it's what stops the widest box in the app from
-                dictating a 282px floor on a 320px screen. Height is unchanged. */}
-            <div
-              className="w-full wide:w-[250px] bg-surface-base border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center overflow-clip"
-              style={{ height: 230 }}
-            >
-              <img
-                src={platform.getBottleUrl(prefs.bottleType, prefs.bottleColor)}
-                alt=""
-                style={{ height: 200, width: 'auto', objectFit: 'contain', display: 'block' }}
-              />
+          Controls-on-the-left is deliberate: the toast only ever arrives
+          centre or right of a real screen, so the preview sits on the side the
+          real thing does — and a Test toast animates in over the empty pane
+          rather than over a dense column of controls. */}
+      <div className="flex-1 min-h-0 flex flex-row-reverse gap-2 px-4 pb-4 narrow:flex-col">
+
+        {/* preview — the elastic half. The control column is rigid, so ALL of
+            the horizontal give lives here; that is what lets the panel hold
+            its size down to an iPhone SE instead of squeezing with the
+            viewport. overflow-clip-margin keeps the resting toast's shadow
+            from being sheared at the pane edge. */}
+        <section className="flex-1 min-w-0 min-h-0 narrow:flex-none flex items-center justify-center p-4 narrow:p-3 rounded-xl bg-surface-card overflow-clip [overflow-clip-margin:12px]">
+          <div className="w-full flex flex-col items-center justify-center gap-4 narrow:gap-2.5">
+
+            {/* Decorative reference, not a live toast: same component as the
+                real thing (so the two can never drift), but inert and
+                unanimated. aria-hidden because Test provides the real one. */}
+            <div className="sip-toast-preview w-full max-w-[450px] pointer-events-none select-none" aria-hidden>
+              <SipToast platform={platform} prefs={prefs} onDismiss={() => {}} mode="preview" />
             </div>
 
-            {/* type thumbnails — 75×75 (1:1) */}
-            <div className="flex flex-col gap-gap-md p-pad-md">
-              <span className="text-text-muted text-md font-medium px-[2px]">Type</span>
-              <div className="flex justify-between">
-                {TYPE_ORDER.map(type => (
+            <button
+              onClick={testToast}
+              /* sip-hover-tint, not a background-image swap: a gradient has no
+                 interpolable "from" state against `none`, so the previous hover
+                 snapped on instead of fading. The utility fades a --state-hover
+                 pseudo-element's opacity, which keeps the alpha token and gets
+                 a real transition. */
+              className="btn-press sip-hover-tint cursor-pointer w-full max-w-[450px] p-3 rounded-3xl border-0 appearance-none outline-none bg-surface-action text-text-action text-center text-[20px] leading-[1.2] font-semibold tracking-normal"
+            >
+              Test
+            </button>
+          </div>
+        </section>
+
+        {/* controls — rigid 290px; the one place scrolling is permitted */}
+        <section className="flex-none basis-[290px] min-h-0 flex flex-col narrow:basis-auto narrow:flex-1 narrow:w-full">
+          {/* The radius is on the SCROLLER, not just the cards: overflow-y clips
+              to the padding box, so without it a card sliding past the top or
+              bottom edge gets squared off mid-scroll. Matching the cards' 16px
+              means the clip follows their own corner. */}
+          <div className="sip-no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-2 rounded-xl">
+
+            {/* ── message ── */}
+            <Card title="Text">
+              <div className="flex flex-col gap-gap-md">
+                <Field label="Title" counter={`${prefs.titleText.length}/40 Chars`} over={prefs.titleText.length >= 35}>
+                  <input
+                    type="text"
+                    value={prefs.titleText}
+                    maxLength={40}
+                    onChange={e => update({ titleText: e.target.value })}
+                    className={`${FIELD_CLS} font-semibold`}
+                  />
+                </Field>
+                <Field label="Message" counter={`${prefs.messageText.length}/60 Chars`} over={prefs.messageText.length >= 55}>
+                  <textarea
+                    value={prefs.messageText}
+                    maxLength={60}
+                    onChange={e => update({ messageText: e.target.value })}
+                    className={`${FIELD_CLS} font-medium h-[72px] resize-none`}
+                  />
+                </Field>
+              </div>
+            </Card>
+
+            {/* ── bottle ── */}
+            <Card title="Bottle">
+              <div className="flex flex-col gap-gap-md">
+                <Field label="Type">
+                  {/* aspect-square, not a fixed height: these are flex-1, so a
+                      fixed height turns them into rectangles the moment the
+                      column goes full-width on a stacked phone. */}
+                  <div className="flex gap-1.5">
+                    {TYPE_ORDER.map(type => (
+                      <button
+                        key={type}
+                        onClick={() => update({ bottleType: type })}
+                        aria-pressed={prefs.bottleType === type}
+                        aria-label={type}
+                        className={`btn-press cursor-pointer flex-1 min-w-0 aspect-square flex items-center justify-center rounded-xl overflow-clip appearance-none p-0 outline-none border ${
+                          prefs.bottleType === type
+                            ? 'bg-surface-selected border-border-selected'
+                            : 'bg-surface-field border-border-field'
+                        }`}
+                      >
+                        <img
+                          src={platform.getBottleUrl(type, prefs.bottleColor)}
+                          alt=""
+                          className="h-[66%] w-auto object-contain block"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <Field label="Color">
+                  <div className="flex gap-1.5">
+                    {COLOR_ORDER.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => update({ bottleColor: color })}
+                        aria-pressed={prefs.bottleColor === color}
+                        aria-label={color}
+                        /* rounded-full, not a px value: these are aspect-square
+                           and flex-1, so their side length changes with the
+                           column width. Any fixed radius would read as a
+                           different shape at 38px than at 49px; 9999px always
+                           resolves to a circle. */
+                        className="btn-press cursor-pointer relative flex-1 min-w-0 aspect-square rounded-full overflow-clip shadow-subtle appearance-none p-0 outline-none border-0"
+                        style={{ backgroundColor: BOTTLE_COLORS[color] }}
+                      >
+                        {/* The design ships no selected state for these. A ring
+                            would collide with the 6px gaps, so selection lives
+                            inside the swatch — white, with a soft shadow so it
+                            survives on yellow as well as on purple. */}
+                        {prefs.bottleColor === color && (
+                          <span className="absolute inset-0 flex items-center justify-center text-white [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.35))]">
+                            <CheckIcon />
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+            </Card>
+
+            {/* ── timing ── */}
+            <Card title="Timing">
+              <div className="relative flex items-center justify-center py-pad-lg rounded-chip bg-surface-field border border-border-field transition-colors focus-within:border-brand-primary">
+                <input
+                  ref={clockRef}
+                  type="text"
+                  inputMode="numeric"
+                  value={clockInput}
+                  onChange={handleClockChange}
+                  onBlur={handleClockBlur}
+                  onKeyDown={handleClockKeyDown}
+                  onPaste={handleClockPaste}
+                  aria-label="Reminder interval"
+                  maxLength={5}
+                  className="absolute inset-0 w-full bg-transparent border-0 outline-none text-center font-sans text-[80px] leading-none font-semibold text-transparent caret-text-strong"
+                />
+                {/* Colored mirror: the native input owns the real value and
+                    caret (its own text is transparent); this overlay repaints
+                    the digits so the colon can be dimmed. */}
+                <div aria-hidden className="pointer-events-none select-none flex items-center justify-center text-[80px] leading-none font-semibold text-text-strong">
+                  {clockInput.slice(0, 2)}
+                  {/* SF Pro Rounded centres the colon on the x-height band, so
+                      it reads low between full-height numerals. -0.08em is the
+                      design's -6.4px at 80px; a transform, so no reflow. */}
+                  <span className="text-text-muted translate-y-[-0.08em]">{clockInput[2]}</span>
+                  {clockInput.slice(3)}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-xs">
+                <span className="shrink-0 text-[15px] leading-[1.2] font-semibold text-text-muted">Every:</span>
+                {/* No tabular-nums. It forces every digit to the widest digit's
+                    advance, which in SF Pro Rounded visibly pads the narrow "1"
+                    — that is the odd gap in "15". Tabular figures earn their
+                    keep in a column of numbers that must align, or a value that
+                    ticks in place; this is a left-aligned phrase inside a flex
+                    row, so it gains nothing and costs the spacing. */}
+                <span className="text-[15px] leading-[1.2] font-semibold text-text-label">
+                  {intervalWords(prefs.intervalMinutes)}
+                </span>
+              </div>
+            </Card>
+
+            {/* ── appearance ── */}
+            <Card title="Appearance">
+              {/* Radii translated from the Paper export by PIXEL, not by class
+                  name — Paper writes against Tailwind's default scale where
+                  rounded-xl is 12px, while this repo remaps rounded-xl to 16px.
+                  Track: 12px (repo rounded-lg), 4px padding, selected segment
+                  8px (repo rounded-sm). Those three are not independent: an
+                  inset child's radius should be the parent's minus the padding
+                  (12 − 4 = 8) or the two curves run non-concentric. */}
+              <div className="flex p-1 rounded-lg bg-surface-field">
+                {(['system', 'light', 'dark'] as const).map(theme => (
                   <button
-                    key={type}
-                    onClick={() => update({ bottleType: type })}
-                    className={`btn-press cursor-pointer relative overflow-clip rounded-md border-0.5 shadow-subtle flex items-center justify-center appearance-none p-0 outline-none ${
-                      prefs.bottleType === type
-                        ? 'bg-state-selected border-border-emphasis'
-                        : 'bg-surface-base border-border-default'
+                    key={theme}
+                    onClick={() => changeTheme(theme)}
+                    aria-pressed={prefs.theme === theme}
+                    /* Semibold in BOTH states (the export has medium when
+                       unselected). Weight no longer carries the selection, so
+                       the row cannot re-flow as the selection moves — colour
+                       and the filled track do the work instead. */
+                    /* Same 8px radius in both states. The track is 12px with
+                       4px of padding, so 8px is also the concentric value —
+                       the pill's curve stays parallel to the track's whether
+                       it is filled or not. */
+                    /* Unselected is bg-surface-field — the TRACK's own colour —
+                       not bg-transparent. Identical at rest, but it changes what
+                       the theme fade animates: transparent makes the outgoing
+                       pill fade its ALPHA out while the incoming fades in, so
+                       mid-fade both are translucent and a light ghost sits over
+                       a darkening track. Two opaque colours cross-fade instead,
+                       which is what every other surface in the app does. */
+                    className={`btn-press cursor-pointer flex-1 min-w-0 flex items-center justify-center gap-1 py-2 rounded-sm border-0 appearance-none outline-none text-[15px] leading-[18px] font-semibold ${
+                      prefs.theme === theme
+                        ? 'bg-surface-selected text-text-primary'
+                        : 'bg-surface-field text-text-tertiary hover:text-text-secondary'
                     }`}
-                    style={{ width: 75, height: 75 }}
                   >
-                    <img src={platform.getBottleUrl(type, prefs.bottleColor)} alt={type} style={{ height: 50, width: 'auto', objectFit: 'contain', display: 'block' }} />
+                    <ThemeIcon theme={theme} />
+                    <span>{theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}</span>
                   </button>
                 ))}
               </div>
-            </div>
+            </Card>
 
-            {/* color swatches — 34×34 */}
-            <div className="flex flex-col gap-gap-md p-pad-md">
-              <span className="text-text-muted text-md font-medium px-[2px]">Color</span>
-              <div className="flex justify-between">
-                {COLOR_ORDER.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => update({ bottleColor: color })}
-                    aria-label={color}
-                    className="btn-press cursor-pointer overflow-clip shadow-subtle appearance-none p-0 outline-none"
-                    style={{
-                      width: 34, height: 34,
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: BOTTLE_COLORS[color],
-                      outline: prefs.bottleColor === color ? `2px solid ${BOTTLE_COLORS[color]}` : undefined,
-                      outlineOffset: prefs.bottleColor === color ? 1 : undefined,
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
           </div>
-
-          {/* bottom-right-controls: text-card on top, bottom-right-row below.
-              Content-sized width (no flex-1) so bottle takes the leftover.
-              justify-between distributes any extra height (from items-stretch on
-              the outer row) between the two children.
-              Below `wide` this grouping has no meaning, so `contents` erases the
-              box and hands its children up to the stacking column. */}
-          <div className="contents wide:flex wide:flex-col wide:gap-gap-lg wide:justify-between">
-
-          {/* text card */}
-          <div className="w-full bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
-            <span className="text-text-secondary text-md font-medium px-[8px]">Text</span>
-
-            <div className="flex flex-col gap-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-text-muted text-md font-medium pl-[8px]">Title</span>
-                <span className={`${prefs.titleText.length >= 35 ? 'text-text-error' : 'text-text-muted'} text-md font-medium pr-[8px]`}>{prefs.titleText.length}/40 Characters</span>
-              </div>
-              {/* rounded-xs (4px) ≈ design's 5px — 1px deviation, no 5px radius token */}
-              <input
-                type="text"
-                value={prefs.titleText}
-                maxLength={40}
-                onChange={e => update({ titleText: e.target.value })}
-                className="bg-surface-raised border-0.5 border-border-emphasis hover:border-border-focus focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-semibold text-text-primary outline-none focus:outline focus:outline-[0.5px] focus:outline-border-focus focus:outline-offset-0 w-full box-border font-sans appearance-none"
-              />
-            </div>
-
-            <div className="flex flex-col gap-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-text-muted text-md font-medium pl-[8px]">Message</span>
-                <span className={`${prefs.messageText.length >= 55 ? 'text-text-error' : 'text-text-muted'} text-md font-medium pr-[8px]`}>{prefs.messageText.length}/60 Characters</span>
-              </div>
-              {/* height:72px: no token */}
-              <textarea
-                value={prefs.messageText}
-                maxLength={60}
-                onChange={e => update({ messageText: e.target.value })}
-                className="bg-surface-raised border-0.5 border-border-emphasis hover:border-border-focus focus:border-border-focus rounded-lg shadow-subtle px-pad-md py-pad-md text-lg font-medium text-text-primary outline-none focus:outline focus:outline-[0.5px] focus:outline-border-focus focus:outline-offset-0 w-full box-border font-sans resize-none"
-                style={{ height: 72 }}
-              />
-            </div>
-          </div>
-
-          {/* ── bottom-right-row: time | icon | appearance ── */}
-          {/* `contents` below `wide` — same reason as the wrapper above: the row
-              dissolves and Time / Icon / Appearance become stacked column items. */}
-          <div className="contents wide:flex wide:flex-row wide:gap-gap-lg wide:items-start">
-
-          {/* time card — wide:flex-1 only; see the bottle card note on why */}
-          <div className="wide:flex-1 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-xl">
-            <span className="text-text-secondary text-md font-medium pl-[4px]">Time</span>
-
-            <div className="relative">
-              <input
-                ref={clockRef}
-                type="text"
-                inputMode="numeric"
-                value={clockInput}
-                onChange={handleClockChange}
-                onBlur={handleClockBlur}
-                onKeyDown={handleClockKeyDown}
-                onPaste={handleClockPaste}
-                placeholder="HH:MM"
-                maxLength={5}
-                className="border-0.5 border-border-emphasis hover:border-border-focus focus:border-border-focus rounded-xl px-pad-md py-pad-md text-xl font-semibold text-transparent caret-text-primary leading-tight text-center w-full outline-none focus:outline focus:outline-[0.5px] focus:outline-border-focus focus:outline-offset-0 bg-surface-raised font-sans appearance-none"
-              />
-              {/* Colored mirror: the native input owns the real value + caret (its
-                  own text is transparent); this overlay repaints the digits so the
-                  colon can be dimmed to text-tertiary. */}
-              <div
-                aria-hidden
-                className="pointer-events-none select-none absolute inset-0 flex items-center justify-center text-xl font-semibold leading-tight text-text-primary font-sans"
-              >
-                {clockInput.slice(0, 2)}
-                {/* SF Pro Rounded centers the colon on the x-height band, so it reads
-                    low between full-height numerals. Nudge it up onto the numeral
-                    optical center. em-based → scales with --text-xl; transform → no reflow. */}
-                <span className="text-text-tertiary translate-y-[-0.08em]">{clockInput[2]}</span>
-                {clockInput.slice(3)}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-start gap-xs p-pad-md">
-              <span className="text-text-muted text-lg font-medium shrink-0">Every:</span>
-              {/* shadow-subtle removed: this box has no background, so the shadow
-                  only ever drew a faint hairline under the text — invisible at the
-                  card's desktop width, but a visible stray line once the card goes
-                  full-width in the stacked layout. */}
-              <div className="flex-1 self-stretch rounded-xs grid" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {/* Ghost sizer — an invisible copy of the widest possible interval
-                    ("23 Hours 59 Minutes"). It shares this grid cell with the real
-                    value, so the cell is always sized for the longest state and the
-                    card never reflows as the value changes. Same classes = same
-                    width, so it self-adjusts if the font or wording ever changes. */}
-                <div aria-hidden className="invisible col-start-1 row-start-1 flex items-center gap-xs whitespace-nowrap">
-                  <span className="text-lg font-medium inline-flex items-center"><span>23</span><span className="ml-1">Hours</span></span>
-                  <span className="text-lg font-medium inline-flex items-center"><span>59</span><span className="ml-1">Minutes</span></span>
-                </div>
-                <div className="col-start-1 row-start-1 flex items-center gap-xs">
-                  {Math.floor(prefs.intervalMinutes / 60) > 0 && (
-                    <span className="text-lg font-medium text-text-primary inline-flex items-center">
-                      <span>{Math.floor(prefs.intervalMinutes / 60)}</span>
-                      <span className="ml-1">{Math.floor(prefs.intervalMinutes / 60) === 1 ? 'Hour' : 'Hours'}</span>
-                    </span>
-                  )}
-                  {prefs.intervalMinutes % 60 > 0 && (
-                    <span className="text-lg font-medium text-text-primary inline-flex items-center">
-                      <span>{prefs.intervalMinutes % 60}</span>
-                      <span className="ml-1">{prefs.intervalMinutes % 60 === 1 ? 'Minute' : 'Minutes'}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* icon card — w-[130px]: fixed width, natural content height.
-              Full-width once stacked; the 130px slot only exists in the row. */}
-          <div className="w-full wide:w-[130px] wide:shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
-            <span className="text-text-secondary text-md font-medium pl-[4px]">Icon</span>
-
-            {/* 100×100 preview — no token.
-                Centering is right in the 130px column, but in a stacked full-width
-                card it strands the icon mid-card away from the "Icon" label and the
-                "Show Logo" row; left-align it there so the card reads as one edge. */}
-            <div className="flex flex-col items-start wide:items-center gap-xs">
-              <div
-                className="border-0.5 border-border-default rounded-xl shadow-subtle flex items-center justify-center bg-surface-base"
-                style={{ width: 100, height: 100 }}
-              >
-                {prefs.customIcon
-                  ? <img src={prefs.customIcon} alt="custom" style={{ maxWidth: 63, maxHeight: 63, objectFit: 'contain', display: 'block' }} />
-                  : <ThemedLogo platform={platform} size={63} assetSize={64} dark={dark} />
-                }
-              </div>
-              <button
-                onClick={pickIcon}
-                className="cursor-pointer bg-transparent border-0 outline-none appearance-none p-0 text-sm font-medium text-text-tertiary hover:text-text-primary transition-colors"
-              >
-                Upload Custom
-              </button>
-            </div>
-
-            {/* show logo — checkbox 18×18: no token */}
-            <div
-              className="btn-press-group flex items-center gap-pad-md cursor-pointer select-none"
-              role="checkbox"
-              aria-checked={prefs.showLogo}
-              tabIndex={0}
-              onClick={() => update({ showLogo: !prefs.showLogo })}
-              onKeyDown={e => e.key === ' ' && update({ showLogo: !prefs.showLogo })}
-            >
-              <div
-                className="btn-press-scale border-0.5 border-border-emphasis rounded-xs shadow-subtle flex items-center justify-center shrink-0 overflow-clip bg-surface-elevated"
-                style={{ width: 18, height: 18 }}
-              >
-                {prefs.showLogo && (
-                  <span className="text-text-primary">
-                    <CheckIcon />
-                  </span>
-                )}
-              </div>
-              <span className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">Show Logo</span>
-            </div>
-          </div>
-
-          {/* appearance card — w-[130px]: no token, matches popup.
-              Full-width once stacked; the 130px slot only exists in the row. */}
-          <div className="w-full wide:w-[130px] wide:shrink-0 bg-surface-primary rounded-xxl shadow border-0.5 border-border-default overflow-clip p-pad-lg flex flex-col gap-gap-sm">
-            <span className="text-text-secondary text-md font-medium pl-[4px]">Appearance</span>
-
-            {/* button group — no chrome; container is just the buttons */}
-            <div className="flex flex-col gap-0.5">
-              {(['system', 'light', 'dark'] as const).map(theme => (
-                <button
-                  key={theme}
-                  onClick={() => changeTheme(theme)}
-                  /* Unselected = bg-transparent (not bg-surface-primary): visually identical
-                     over the surface-primary card at rest, but it keeps the alpha profile
-                     aligned with the selected state (state-selected ~0.08). Otherwise the
-                     just-picked button gets its bg animated from opaque surface-primary →
-                     transparent state-selected on a theme switch, so its opaque color "holds"
-                     and lags the crossfade instead of fading in with it. */
-                  className={`cursor-pointer flex items-center gap-1 rounded-md px-0.5 py-1 border-0 outline-none appearance-none w-full ${
-                    prefs.theme === theme
-                      ? 'bg-state-selected text-text-secondary'
-                      : 'bg-transparent text-text-tertiary hover:bg-state-hover hover:text-text-secondary'
-                  }`}
-                >
-                  <div
-                    className="rounded-sm shadow-subtle flex items-center justify-center shrink-0"
-                    style={{ width: 24, height: 24 }}
-                  >
-                    <ThemeIcon theme={theme} />
-                  </div>
-                  <span className="text-sm font-medium text-left">
-                    {theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-          </div>{/* /bottom-right-row */}
-          </div>{/* /bottom-right-controls */}
-        </div>{/* /bottom-controls */}
-        </div>{/* /settings-controls */}
+        </section>
+      </div>
     </div>
     </>
+  )
+}
+
+// ─── control-panel primitives ─────────────────────────────────────────────────
+
+// Every card is the same box: 16px padding, 16px internal gap, 24px radius,
+// recessed surface, one uppercase heading. Inter-card gap is 8px, set by the
+// scroller.
+function Card({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex-none flex flex-col gap-gap-md p-pad-lg rounded-xl bg-surface-card">
+      <span className="text-[13px] leading-[1.25] font-semibold uppercase tracking-[0.02em] text-text-muted">
+        {title}
+      </span>
+      {children}
+    </div>
+  )
+}
+
+// Label row + control. `counter` is optional — Bottle's Type/Color rows use the
+// same label treatment without one.
+function Field({ label, counter, over, children }: {
+  label: string; counter?: string; over?: boolean; children: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[16px] leading-[1.2] font-semibold text-text-label">{label}</span>
+        {counter && (
+          <span className={`text-[16px] leading-[1.2] font-medium ${over ? 'text-text-error' : 'text-text-muted'}`}>
+            {counter}
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// Focus is a brand-blue 1px stroke assembled from a 0.5px border plus a 0.5px
+// outline, so gaining focus can never reflow the field.
+const FIELD_CLS =
+  'w-full box-border p-pad-md rounded-lg bg-surface-field border border-border-field ' +
+  'text-text-strong font-sans text-[15px] leading-[1.25] appearance-none ' +
+  'outline-none transition-colors focus:border-brand-primary focus:outline ' +
+  'focus:outline-[0.5px] focus:outline-brand-primary focus:outline-offset-0'
+
+// ─── brand mark ───────────────────────────────────────────────────────────────
+// Inline rather than an <img>: it is a fixed two-stop gradient that does not
+// change with theme, so there is nothing to swap and no request to make. The
+// gradient id is namespaced — a bare "paint0_linear" collides with any other
+// inlined SVG on the page and silently repaints one of them.
+
+export function SipMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 1024 1024" fill="none" className="block shrink-0" aria-label="Sip Hydra">
+      <path d="M0 512C0 229.23 229.23 0 512 0V0C794.77 0 1024 229.23 1024 512V512C1024 794.77 794.77 1024 512 1024V1024C229.23 1024 0 794.77 0 512V512Z" fill="url(#sipMark0)"/>
+      <path d="M758.006 535.607C740.026 543.125 720.357 545.207 701.11 543.373C688.397 542.158 676.853 538.622 665.316 533.806C658.989 531.162 653.713 527.511 648.222 523.545C632.876 512.458 618.64 496.117 610.863 478.924C605.819 467.788 602.109 456.808 600.444 444.656C596.08 412.799 602.018 378.034 612.726 347.706C615.352 338.305 619.559 330.109 623.418 321.236L629.994 306.142L654.583 256.548L660.14 245.453L676.124 213.431L693.756 178.221C696.654 172.421 699.71 166.894 704.845 162.805C709.938 158.748 717.682 159.103 722.378 163.796C726.361 167.778 729.823 172.553 732.448 177.642L745.699 203.245L756.433 224.758L765.617 242.983L799.564 310.496L803.415 319.088L810.024 334.05C817.685 351.391 822.828 369.608 825.81 388.378C826.977 395.747 828.418 402.67 828.907 409.957C830.199 429.256 829.114 443.838 823.706 462.286C819.341 477.157 812.525 490.449 802.289 502.098L786.628 517.779C778.404 526.007 768.698 531.146 758.031 535.607H758.006Z" fill="url(#sipMark1)"/>
+      <path d="M435.127 850.012C405.26 862.542 372.587 866.012 340.616 862.955C319.499 860.931 300.322 855.037 281.158 847.01C270.648 842.604 261.885 836.518 252.764 829.909C227.272 811.43 203.623 784.195 190.706 755.541C182.328 736.98 176.164 718.681 173.399 698.426C166.149 645.332 176.013 587.391 193.801 536.844C198.162 521.174 205.151 507.515 211.561 492.727L222.484 467.571L263.329 384.914L272.56 366.422L299.111 313.052L328.4 254.368C333.215 244.702 338.291 235.49 346.821 228.674C355.281 221.914 368.144 222.506 375.944 230.327C382.561 236.963 388.312 244.922 392.673 253.404L414.684 296.075L432.513 331.93L447.77 362.305L504.16 474.827L510.557 489.147L521.535 514.083C534.26 542.985 542.803 573.346 547.756 604.63C549.696 616.912 552.089 628.451 552.901 640.595C555.047 672.76 553.245 697.063 544.262 727.81C537.012 752.594 525.69 774.749 508.686 794.164L482.671 820.298C469.011 834.012 452.887 842.576 435.168 850.012H435.127Z" fill="url(#sipMark2)"/>
+      <defs>
+      <linearGradient id="sipMark0" x1="512" y1="0" x2="512" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#00D9E7"/>
+      <stop offset="1" stopColor="#3D3BFF"/>
+      </linearGradient>
+      <linearGradient id="sipMark1" x1="714.2" y1="160" x2="714.2" y2="543.999" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#D8F8FB"/>
+      <stop offset="1" stopColor="#00D9E7"/>
+      </linearGradient>
+      <linearGradient id="sipMark2" x1="362.36" y1="224" x2="362.36" y2="863.998" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#AFF0F5"/>
+      <stop offset="1" stopColor="#00D9E7"/>
+      </linearGradient>
+      </defs>
+    </svg>
   )
 }
 
@@ -698,71 +640,6 @@ export function ThemedLogo({
   )
 }
 
-// ─── toast preview (visual-only, no dismiss logic) ────────────────────────────
-
-function ToastPreview({ platform, prefs, dark }: { platform: SipPlatform; prefs: SipPrefs; dark: boolean }) {
-  const src = platform.getBottleUrl(prefs.bottleType, prefs.bottleColor)
-
-  return (
-    <div className="w-full max-w-[450px] bg-surface-elevated border-0.5 border-border-emphasis rounded-xl shadow p-pad-xl flex flex-col overflow-clip">
-
-      {/* ── inner row: toast-left + close × ── */}
-      <div className="flex gap-gap-xl items-start justify-between">
-
-        {/* toast-left: bottle + main content */}
-        <div className="flex flex-1 min-w-0 gap-pad-xl items-start">
-
-          {/* bottle */}
-          <div style={{ position: 'relative', width: 24, height: 60, flexShrink: 0, isolation: 'isolate' }}>
-            <img
-              src={src}
-              alt=""
-              className="sip-bottle-shimmer"
-              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-            />
-            <div
-              className="sip-bottle-shimmer-overlay"
-              style={{ WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` }}
-            />
-          </div>
-
-          {/* main content */}
-          <div className="flex flex-1 min-w-0 flex-col gap-pad-xl">
-            <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-pad-sm max-w-full">
-                <span className="min-w-0 text-text-primary text-lg font-semibold leading-tight overflow-hidden text-ellipsis whitespace-nowrap">
-                  {prefs.titleText || 'Title'}
-                </span>
-                {prefs.showLogo && (
-                  /* flex (not block): a block wrapper gets a 24px text line box
-                     (base line-height strut) around the 16px logo, inflating the
-                     title row and shifting the whole toast when toggled. flex
-                     shrink-wraps to the logo so items-center can truly center it. */
-                  <div className="shrink-0 flex">
-                    {prefs.customIcon
-                      ? <img src={prefs.customIcon} width={28} height={18} className="block rounded-md object-cover" />
-                      : <ThemedLogo platform={platform} size={16} assetSize={32} dark={dark} radius={4} />
-                    }
-                  </div>
-                )}
-              </div>
-              <p className="m-0 text-text-muted text-sm font-medium leading-[16px]">
-                {prefs.messageText || 'Message'}
-              </p>
-            </div>
-            <span className="text-text-brand text-sm font-medium leading-[16px]">Edit preferences</span>
-          </div>
-        </div>
-
-        {/* close × */}
-        <span className="shrink-0 text-text-muted p-xs leading-none">
-          <XIcon size={10} />
-        </span>
-      </div>
-    </div>
-  )
-}
-
 // ─── icons ────────────────────────────────────────────────────────────────────
 
 export function XIcon({ size = 10 }: { size?: number }) {
@@ -783,29 +660,42 @@ function CheckIcon() {
 }
 
 function ThemeIcon({ theme }: { theme: 'system' | 'light' | 'dark' }) {
-  // stroke=currentColor lets the parent button's text color drive the icon,
-  // so inactive/hover/active states are controlled in one place.
+  // 18px, and stroke weights straight from the export — deliberately NOT
+  // uniform: the frames are 2.5 and the small interior marks are 2, so the
+  // detail does not read heavier than the shape containing it. Scaling these
+  // to a single weight is what makes icon sets look muddy at small sizes.
+  //
+  // stroke=currentColor throughout (the export hard-codes #8D8F98 / #323338),
+  // so the parent button's text colour drives the icon and selected / hover /
+  // idle are all controlled in one place.
   if (theme === 'system') {
     return (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-        <path d="M21 7V17C21 20 19.5 22 16 22H8C4.5 22 3 20 3 17V7C3 4 4.5 2 8 2H16C19.5 2 21 4 21 7Z" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M16.25 11H7.75C6.79 11 6 10.21 6 9.25V6.75C6 5.79 6.79 5 7.75 5H16.25C17.21 5 18 5.79 18 6.75V9.25C18 10.21 17.21 11 16.25 11Z" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M10.3 15.28L8 17.58M8.03 15.31L10.33 17.61" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M16.49 15.33H16.51M14.49 17.5V17.48" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="18" height="18" viewBox="0 0 28.8 28.8" fill="none" className="shrink-0" aria-hidden>
+        <path d="M25.2 8.402v12c0 3.6-1.8 6-6 6H9.6c-4.2 0-6-2.4-6-6V8.402c0-3.6 1.8-6 6-6h9.6c4.2 0 6 2.4 6 6Z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="7.2" y="6.002" width="14.4" height="7.2" rx="1.75" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12.36 18.362l-2.76 2.76m0-2.76l2.76 2.76" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )
   }
   if (theme === 'light') {
+    // icon:sun.svg, inlined with currentColor swapped in for its #323338.
     return (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-        <path d="M12 18.5C15.59 18.5 18.5 15.59 18.5 12C18.5 8.41 15.59 5.5 12 5.5C8.41 5.5 5.5 8.41 5.5 12C5.5 15.59 8.41 18.5 12 18.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M19.14 19.14L19.01 19.01M19.01 4.99L19.14 4.86M4.86 19.14L4.99 19.01M12 2.08V2M12 22V21.92M2.08 12H2M22 12H21.92M4.99 4.99L4.86 4.86" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="18" height="18" viewBox="0 6.383 18 18" fill="none" className="shrink-0" aria-hidden>
+        <circle cx="9" cy="15" r="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M9 7.5v1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M9 21v1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M3.697 9.697l1.058 1.058" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M13.245 19.245l1.058 1.057" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M1.5 15h1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M15 15h1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M4.755 19.245l-1.057 1.057" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14.303 9.697l-1.058 1.058" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )
   }
   return (
-    <svg width="15" height="15" viewBox="-1.5 -1.3 24 24" fill="none">
-      <path d="M0.777 11.175C1.137 16.325 5.507 20.515 10.737 20.745C14.427 20.905 17.727 19.185 19.707 16.475C20.527 15.365 20.087 14.625 18.717 14.875C18.047 14.995 17.357 15.045 16.637 15.015C11.747 14.815 7.747 10.725 7.727 5.895C7.717 4.595 7.987 3.365 8.477 2.245C9.017 1.005 8.367 0.415 7.117 0.945C3.157 2.615 0.447 6.605 0.777 11.175Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="18" height="18" viewBox="-1.5 -1.3 28.8 28.8" fill="none" className="shrink-0" aria-hidden>
+      <path d="M1.694 14.063c0.416 5.767 5.47 10.459 11.519 10.716 4.267 0.179 8.084-1.747 10.373-4.781 0.948-1.243 0.439-2.072-1.145-1.791-0.775 0.134-1.573 0.19-2.405 0.156-5.655-0.224-10.281-4.804-10.304-10.212-0.012-1.456 0.301-2.833 0.867-4.087 0.624-1.389-0.127-2.049-1.573-1.456C4.447 4.478 1.313 8.946 1.694 14.063Z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }

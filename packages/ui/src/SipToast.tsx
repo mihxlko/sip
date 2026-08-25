@@ -6,19 +6,12 @@ import { type BottleColor, type BottleType, type SipPlatform, type SipPrefs } fr
 const DISMISS_MS = 8_000
 const FADE_MS    = 200
 
-function resolveIsDark(theme: SipPrefs['theme']): boolean {
-  if (theme === 'dark')  return true
-  if (theme === 'light') return false
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-}
-
 // ─── component ───────────────────────────────────────────────────────────────
 
 interface Props { platform: SipPlatform; prefs: SipPrefs; onDismiss: () => void; mode?: 'live' | 'preview' }
 
 export default function SipToast({ platform, prefs, onDismiss, mode = 'live' }: Props) {
   const [out, setOut] = useState(false)
-  const dark = resolveIsDark(prefs.theme)
 
   // In 'preview' mode Sonner owns both the auto-dismiss timer (via the
   // `duration` option) and the enter/exit animation, so the manual
@@ -63,19 +56,14 @@ export default function SipToast({ platform, prefs, onDismiss, mode = 'live' }: 
 
               {/* title row — max-w matches the message width so a long title
                   can't push main-content wider than the 350px message */}
+              {/* v2 dropped the logo badge that used to sit beside the title.
+                  Removed here and not just in Settings' preview: Test fires this
+                  very component top-right while the preview sits alongside it,
+                  so any difference between the two is immediately visible. */}
               <div className="sip-toast-title-row">
                 <span className="sip-toast-title">
                   {prefs.titleText}
                 </span>
-
-                {prefs.showLogo && (
-                  <div className="sip-toast-badge">
-                    {prefs.customIcon
-                      ? <img src={prefs.customIcon} width={28} height={18} className="sip-toast-badge-img" />
-                      : <img src={platform.getIconUrl(32, dark)} width={16} height={16} alt="SIP" style={{ display: 'block', borderRadius: 4 }} />
-                    }
-                  </div>
-                )}
               </div>
 
               {/* message — 350px fixed (outdated); drives the toast's overall width */}

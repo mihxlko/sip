@@ -53,7 +53,7 @@ export default function App() {
         <span className="text-sm font-medium text-text-muted" style={{ letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Next sip in
         </span>
-        {/* 36px — no token between text-lg (16px) and text-xl (60px) */}
+        {/* 36px — no token between text-lg (17px) and text-xl (80px) */}
         <span className="font-semibold text-text-primary" style={{ fontSize: 36, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
           {display}
         </span>

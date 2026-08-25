@@ -21,12 +21,9 @@ body {
 #root {
   width: 100%;
   max-width: 2240px;
-  /* centered to match the web shell — the fixed nav centers on the viewport,
-     so the content column must too or they misalign past 2240px */
+  /* centered to match the web shell */
   margin-inline: auto;
-  /* Vertical only — the horizontal gutter is owned by Settings' own 24px padding
-     so the nav, the card column and the 920px stacking breakpoint all derive
-     from one number. Mirrors apps/web/src/app/page.tsx. */
-  padding: var(--space-padding-xl) 0;
+  /* No padding: v2's Settings is a full-height flex tree that owns its own
+     gutters and needs to fill 100dvh. Mirrors apps/web/src/app/page.tsx. */
   box-sizing: border-box;
 }
