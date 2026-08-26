@@ -436,7 +436,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                         style={{ backgroundColor: BOTTLE_COLORS[color] }}
                       >
                         {/* Selected state, per the Aug 25 spec: a fill-less
-                            ring — 24px across with a 6px stroke — centred in
+                            ring — 24px across with a 4px stroke — centred in
                             the swatch. The stroke is --surface-card, so it
                             reads as a hole punched through the swatch down to
                             the card behind it. That is what lets it carry the
@@ -447,15 +447,18 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                             cqw, not px, for the same reason the radius is
                             rounded-full: the swatch is flex-1 and aspect-square,
                             so it is 38px beside a 290px column and ~49px on a
-                            stacked phone. 63/16cqw resolves to exactly 24px and
-                            6px at 38px and keeps the proportion everywhere
-                            else, instead of shrinking to a dot as the swatch
-                            grows. Drawing the ring INSIDE the swatch is also
+                            stacked phone. 63/10.6cqw resolves to 24px and 4px at
+                            38px and keeps the proportion everywhere else,
+                            instead of shrinking to a dot as the swatch grows.
+                            10.6 and not the exact 10.53: Chrome FLOORS a used
+                            border-width to whole pixels, so aiming dead-on at
+                            4.00 lands on 3 and the stroke silently loses a
+                            quarter of its weight. Drawing the ring INSIDE the swatch is also
                             what keeps it free: an outer ring would need room
                             the 6px gaps do not have. */}
                         {prefs.bottleColor === color && (
                           <span className="absolute inset-0 flex items-center justify-center">
-                            <span className="size-[63cqw] rounded-full border-[16cqw] border-solid border-surface-card" />
+                            <span className="size-[63cqw] rounded-full border-[10.6cqw] border-solid border-surface-card" />
                           </span>
                         )}
                       </button>
