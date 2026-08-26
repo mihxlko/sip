@@ -430,16 +430,32 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                            column width. Any fixed radius would read as a
                            different shape at 38px than at 49px; 9999px always
                            resolves to a circle. */
-                        className="btn-press cursor-pointer relative flex-1 min-w-0 aspect-square rounded-full overflow-clip shadow-subtle appearance-none p-0 outline-none border-0"
+                        /* container-type is for the ring below, which is sized
+                           in cqw off this button. */
+                        className="btn-press cursor-pointer relative flex-1 min-w-0 aspect-square rounded-full overflow-clip shadow-subtle appearance-none p-0 outline-none border-0 [container-type:inline-size]"
                         style={{ backgroundColor: BOTTLE_COLORS[color] }}
                       >
-                        {/* The design ships no selected state for these. A ring
-                            would collide with the 6px gaps, so selection lives
-                            inside the swatch — white, with a soft shadow so it
-                            survives on yellow as well as on purple. */}
+                        {/* Selected state, per the Aug 25 spec: a fill-less
+                            ring — 24px across with a 6px stroke — centred in
+                            the swatch. The stroke is --surface-card, so it
+                            reads as a hole punched through the swatch down to
+                            the card behind it. That is what lets it carry the
+                            state with no shadow or halo: it is never "white on
+                            yellow", it is always exactly the surface it sits
+                            on, in either theme (#F8F8F9 light, #1F2023 dark).
+
+                            cqw, not px, for the same reason the radius is
+                            rounded-full: the swatch is flex-1 and aspect-square,
+                            so it is 38px beside a 290px column and ~49px on a
+                            stacked phone. 63/16cqw resolves to exactly 24px and
+                            6px at 38px and keeps the proportion everywhere
+                            else, instead of shrinking to a dot as the swatch
+                            grows. Drawing the ring INSIDE the swatch is also
+                            what keeps it free: an outer ring would need room
+                            the 6px gaps do not have. */}
                         {prefs.bottleColor === color && (
-                          <span className="absolute inset-0 flex items-center justify-center text-white [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.35))]">
-                            <CheckIcon />
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="size-[63cqw] rounded-full border-[16cqw] border-solid border-surface-card" />
                           </span>
                         )}
                       </button>
@@ -647,14 +663,6 @@ export function XIcon({ size = 10 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 8 8" fill="currentColor">
       <path d="M6.8 7.6L0.4 1.2C0.181 0.981 0.181 0.619 0.4 0.4C0.619 0.181 0.981 0.181 1.2 0.4L7.6 6.8C7.819 7.019 7.819 7.381 7.6 7.6C7.381 7.819 7.019 7.819 6.8 7.6Z" />
       <path d="M0.4 7.6C0.181 7.381 0.181 7.019 0.4 6.8L6.8 0.4C7.019 0.181 7.381 0.181 7.6 0.4C7.819 0.619 7.819 0.981 7.6 1.2L1.2 7.6C0.981 7.819 0.619 7.819 0.4 7.6Z" />
-    </svg>
-  )
-}
-
-function CheckIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M9.86 18a1 1 0 0 1-.73-.32l-4.86-5.17a1 1 0 1 1 1.46-1.37l4.12 4.39 8.41-9.2a1 1 0 1 1 1.48 1.34l-9.14 10a1 1 0 0 1-.73.33z" />
     </svg>
   )
 }
