@@ -21,7 +21,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["bottles/*", "icons/sip-icon-*.png", "icons/sip-icon-dark-*.png"],
+      "resources": ["bottles/*", "icons/sip-icon-*.png", "icons/sip-icon-dark-*.png", "fonts/*.woff2"],
       "matches": ["<all_urls>"]
     }
   ],
