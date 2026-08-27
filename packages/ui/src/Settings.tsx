@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Toaster, toast as sonnerToast } from 'sonner'
 import {
   BottleColor, BottleType, DEFAULT_PREFS, type SipPlatform, type SipPrefs,
@@ -24,16 +24,6 @@ const TYPE_ORDER: BottleType[] = [BottleType.Classic, BottleType.Wide, BottleTyp
 
 const THEME_ORDER = ['system', 'light', 'dark'] as const
 const THEME_LABEL = { system: 'System', light: 'Light', dark: 'Dark' } as const
-
-// The one class list the real Appearance buttons and their inert copies inside
-// .sip-pill-fill BOTH use. Shared, not duplicated: the copies are revealed
-// through a clip-path window sized to the real item, so a single pixel of
-// divergence in padding, gap, size or weight ghosts one label against the
-// other. Anything that is not shared (colour, cursor, the button reset) is
-// appended at the call site.
-const PILL_ITEM_CLS =
-  'flex-1 min-w-0 flex items-center justify-center gap-1 py-2 text-[15px] leading-[18px] font-semibold'
-
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -65,15 +55,6 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
   // explicit user pick (changeTheme), so load/getPrefs never animates.
   const themeAnimRef = useRef(false)
   const themeTransTimer = useRef<ReturnType<typeof setTimeout>>()
-
-  // Appearance pill. `fill` is the measured clip-path window over the active
-  // segment; `animated` gates the travel.
-  const pillFillRef = useRef<HTMLDivElement>(null)
-  const pillActiveRef = useRef<HTMLButtonElement | null>(null)
-  const [pillFill, setPillFill] =
-    useState<{ left: number; right: number; direction: 'forward' | 'backward' } | null>(null)
-  const [pillAnimated, setPillAnimated] = useState(false)
-  const pillAnimTimer = useRef<ReturnType<typeof setTimeout>>()
 
   useEffect(() => {
     let live = true
@@ -123,66 +104,12 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
     else html.setAttribute('data-theme', prefs.theme)
   }, [prefs.theme])
 
-  useEffect(() => () => {
-    clearTimeout(themeTransTimer.current)
-    clearTimeout(pillAnimTimer.current)
-  }, [])
-
-  // Measure the clip-path window over the active segment. Four things here are
-  // load-bearing:
-  //
-  //   · The item is measured against the FILL LAYER, not the viewport or the
-  //     track. One coordinate space means the window and the copy it reveals
-  //     cannot drift, whatever scrolls or resizes around them.
-  //   · useLayoutEffect, so the window is right in the first painted frame —
-  //     including the very first, where it starts as an empty window (right:
-  //     100%) so nothing flashes full-width before the measurement lands.
-  //   · ResizeObserver catches the `narrow` restack and the font landing, both
-  //     of which change segment widths after mount.
-  //   · The identity bail-out (`return prev`) stops the observer feeding back
-  //     into itself.
-  useLayoutEffect(() => {
-    const fill = pillFillRef.current
-    const active = pillActiveRef.current
-    if (!fill || !active) return
-
-    const measure = () => {
-      const layer = fill.getBoundingClientRect()
-      const item = active.getBoundingClientRect()
-      if (!layer.width) return
-      const left = item.left - layer.left
-      const right = layer.right - item.right
-      setPillFill(prev => {
-        if (prev && prev.left === left && prev.right === right) return prev
-        // Which physical edge leads flips with travel direction. A comparison,
-        // not an index, so system → dark skipping past light needs no special
-        // case.
-        return { left, right, direction: prev && left < prev.left ? 'backward' : 'forward' }
-      })
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(fill)
-    observer.observe(active)
-    return () => observer.disconnect()
-  }, [prefs.theme])
+  useEffect(() => () => clearTimeout(themeTransTimer.current), [])
 
   // User-initiated theme change — arms the transition, then updates prefs. The
   // arm is consumed by the data-theme effect above on the resulting re-render.
   function changeTheme(theme: SipPrefs['theme']) {
     themeAnimRef.current = true
-    // The pill travels for an explicit pick and nothing else. Note this is
-    // state, not the one-frame mount gate the technique usually ships with:
-    // prefs arrive ASYNCHRONOUSLY here, so a stored 'dark' lands several
-    // frames after mount, long past any rAF gate — and restoring a preference
-    // must never animate. Arming only on click covers that, and the timer
-    // disarms afterwards so a later window resize re-measures without the pill
-    // gliding to its new position. 300ms outlasts the 48ms + 190ms travel, so
-    // it can never cut the transition short.
-    setPillAnimated(true)
-    clearTimeout(pillAnimTimer.current)
-    pillAnimTimer.current = setTimeout(() => setPillAnimated(false), 300)
     update({ theme })
   }
 
@@ -596,66 +523,50 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                   8px (repo rounded-sm). Those three are not independent: an
                   inset child's radius should be the parent's minus the padding
                   (12 − 4 = 8) or the two curves run non-concentric. */}
-              <div className="relative flex p-1 rounded-lg bg-surface-field">
+              {/* Three buttons. The selection does NOT travel between them, and
+                  that is a decision, not an omission — see
+                  prototypes/appearance-pill.html, which is the built-and-
+                  measured version of the sliding pill and the record of why it
+                  was removed. Short version: the selected pill is darker than
+                  its track in light and lighter than it in dark, so its
+                  contrast has to pass through zero somewhere in the 300ms theme
+                  cross-fade. A selection indicator that goes invisible while
+                  moving is worse than one that does not move, and the only fix
+                  that measured well needed the pill to visibly refuse to change
+                  theme with the rest of the app. An instant swap has none of
+                  that: it is over before the fade is anywhere near the
+                  crossing. */}
+              <div className="flex p-1 rounded-lg bg-surface-field">
                 {THEME_ORDER.map(theme => (
                   <button
                     key={theme}
-                    ref={el => { if (prefs.theme === theme) pillActiveRef.current = el }}
                     onClick={() => changeTheme(theme)}
                     aria-pressed={prefs.theme === theme}
                     /* Semibold in BOTH states (the export has medium when
                        unselected). Weight no longer carries the selection, so
                        the row cannot re-flow as the selection moves — colour
-                       and the travelling fill do the work instead. */
-                    /* Every real button is painted UNSELECTED. The selected
-                       colours live entirely in the fill copy below, which is
-                       the whole point of the technique: if the selected style
-                       also sat here, the outgoing segment would stay filled
-                       under the pill for the length of the travel. */
-                    /* No btn-press. The copies are spans and can never match
-                       :active, so a 4% scale dip on the real button would
-                       shrink the label underneath while the clipped copy over
-                       it held still — a visible double image at exactly the
-                       moment of the click. The travel is the acknowledgement
-                       the dip was providing, and it is a much louder one. */
-                    /* Hover is the label waking up and nothing else, and only
-                       on the inactive two: a hover FILL would put two filled
-                       pills on screen at once, which is the ambiguity the
-                       travel exists to remove. */
-                    className={`cursor-pointer ${PILL_ITEM_CLS} rounded-sm border-0 appearance-none outline-none bg-surface-field transition-colors ${
+                       and the filled track do the work instead. */
+                    /* Same 8px radius in both states. The track is 12px with
+                       4px of padding, so 8px is also the concentric value —
+                       the pill's curve stays parallel to the track's whether
+                       it is filled or not. */
+                    /* Unselected is bg-surface-field — the TRACK's own colour —
+                       not bg-transparent. Identical at rest, but it changes what
+                       the theme fade animates: transparent makes the outgoing
+                       pill fade its ALPHA out while the incoming fades in, so
+                       mid-fade both are translucent and a light ghost sits over
+                       a darkening track. Two opaque colours cross-fade instead,
+                       which is what every other surface in the app does. */
+                    className={`btn-press cursor-pointer flex-1 min-w-0 flex items-center justify-center gap-1 py-2 rounded-sm border-0 appearance-none outline-none text-[15px] leading-[18px] font-semibold ${
                       prefs.theme === theme
-                        ? 'text-text-tertiary'
-                        : 'text-text-tertiary hover:text-text-secondary'
+                        ? 'bg-surface-selected text-text-primary'
+                        : 'bg-surface-field text-text-tertiary hover:text-text-secondary'
                     }`}
                   >
                     <ThemeIcon theme={theme} />
                     <span>{THEME_LABEL[theme]}</span>
                   </button>
                 ))}
-
-                {/* The fill: an inert copy of the row above, painted selected,
-                    revealed only inside the measured window. aria-hidden and
-                    built from spans so it is in neither the a11y tree nor the
-                    tab order; pointer-events-none so the clicks land on the
-                    real buttons. See .sip-pill-fill in tokens.css. */}
-                <div
-                  ref={pillFillRef}
-                  aria-hidden
-                  className="sip-pill-fill"
-                  data-animated={pillAnimated}
-                  data-direction={pillFill?.direction ?? 'forward'}
-                  style={pillFill ? {
-                    '--sip-pill-left': `${pillFill.left}px`,
-                    '--sip-pill-right': `${pillFill.right}px`,
-                  } as CSSProperties : undefined}
-                >
-                  {THEME_ORDER.map(theme => (
-                    <span key={theme} className={PILL_ITEM_CLS}>
-                      <ThemeIcon theme={theme} />
-                      <span>{THEME_LABEL[theme]}</span>
-                    </span>
-                  ))}
-                </div>
               </div>
             </Card>
 
