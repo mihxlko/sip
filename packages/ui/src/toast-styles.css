@@ -93,7 +93,14 @@
   --color-button: var(--surface-primary);
 
   /* ── typography ─────────────────────────────────────────────────────── */
-  --font-sans: "SF Pro Rounded", sans-serif;
+  /* Must stay byte-identical to tokens.css. Deliberately NO @font-face here:
+     this sheet is injected as text into a shadow root on a third-party page,
+     where @font-face is ignored and `/fonts/…` would resolve against the host
+     site's origin. The content script registers the same three files on the
+     host document instead — see apps/extension/src/content/index.tsx. On the
+     two surfaces that load this sheet normally (the web app, the extension's
+     settings page) tokens.css is imported first and already declares them. */
+  --font-sans: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   --text-sm: 13px;
   --text-md: 15px;
