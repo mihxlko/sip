@@ -17,6 +17,19 @@
    font-bold ever lands, its face has to be generated here or the browser will
    synthesise a fake bold from 600.
 
+   font-display:optional, not swap, and that is a deliberate trade. `swap`
+   repaints the page in a different face the instant the woff2 lands — measured
+   in both engines, it fires on EVERY load where the font is not already
+   cached, however small the metric delta. `optional` gives the browser a ~100ms
+   block window: if the font makes it, it is used with no swap; if it does not,
+   the fallback is kept for that page load and the font is cached for the next
+   one. Either way the reader never sees type change under them.
+   The cost is that a first visit on a slow connection renders in ui-rounded —
+   acceptable here precisely because that fallback is itself a rounded face on
+   Apple platforms, so the failure mode is "slightly different rounded font",
+   not "wrong typeface". Paired with the preloads in apps/web layout.tsx, which
+   start the fetch ~320ms earlier and make the block window winnable.
+
    The `/fonts/…` path resolves for both consumers: Next serves apps/web/public
    at the origin root, and the extension's chrome-extension:// pages resolve it
    against their own root. The content-script toast cannot use this rule at all
@@ -30,21 +43,21 @@
   src: url("/fonts/SF-Pro-Rounded-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
 }
 @font-face {
   font-family: "SF Pro Rounded";
   src: url("/fonts/SF-Pro-Rounded-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
 }
 @font-face {
   font-family: "SF Pro Rounded";
   src: url("/fonts/SF-Pro-Rounded-Semibold.woff2") format("woff2");
   font-weight: 600;
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
 }
 
 :root {

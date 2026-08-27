@@ -15,9 +15,12 @@ import { chromePlatform } from '../platform'
 // extension-absolute URLs. Font faces added to document.fonts are visible
 // inside the shadow root, which is what makes this work at all.
 //
-// Registration is idempotent and deliberately not awaited: font-display:swap
-// equivalent behaviour is automatic here, so the toast paints immediately in
-// the ui-rounded fallback and upgrades in place when the woff2 lands.
+// Registration is idempotent and deliberately not awaited. `display: 'optional'`
+// mirrors tokens.css and matters more here than anywhere else: a toast is on
+// screen for a few seconds, so type reflowing mid-read is the most conspicuous
+// place a swap could land. These files come off local disk rather than the
+// network, so the ~100ms block window is almost always won; when it is not, the
+// toast simply renders in ui-rounded for its lifetime and never changes.
 const FONT_WEIGHTS = [
   ['400', 'SF-Pro-Rounded-Regular.woff2'],
   ['500', 'SF-Pro-Rounded-Medium.woff2'],
@@ -34,7 +37,7 @@ function registerToastFonts() {
       const face = new FontFace(
         'SF Pro Rounded',
         `url(${chrome.runtime.getURL(`fonts/${file}`)})`,
-        { weight, style: 'normal', display: 'swap' },
+        { weight, style: 'normal', display: 'optional' },
       )
       face.load().then(f => document.fonts.add(f)).catch(() => {
         /* host CSP can block extension font URLs; the ui-rounded fallback holds */
