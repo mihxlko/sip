@@ -3,12 +3,69 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sip — Appearance pill tuning lab</title>
+<title>Sip — Appearance pill tuning lab (rejected, kept as a record)</title>
 
 <!--
   ────────────────────────────────────────────────────────────────────────────
   SIP · APPEARANCE PILL / THEME CROSS-FADE TUNING LAB
   Self-contained. Open directly (file://) — no build step, no network.
+
+  ══ VERDICT: THIS DOES NOT SHIP. Aug 26, 2026. ══════════════════════════════
+
+    The sliding pill was built, measured here, and then REMOVED from
+    Settings.tsx. Nothing below is in the product. This file is kept as the
+    record of why, because the reason is not obvious and is easy to re-propose.
+
+    THE REASON, IN ONE LINE
+      A travelling selection indicator and a global theme cross-fade cannot
+      share a click, because the indicator's own contrast has to invert
+      mid-flight — so the thing that is supposed to be showing you what you
+      selected is invisible for part of the move.
+
+    THE MECHANISM
+      Sip's selected pill is DARKER than its track in light (#F1F1F2 on
+      #FFFFFF, Δ14) and LIGHTER than it in dark (#323338 on #28282C, Δ11).
+      Two straight interpolations with opposite polarity MUST cross. So every
+      theme switch has a moment where the pill is exactly its track's colour
+      and vanishes — and the label inversion goes with it, because the fill's
+      label crosses --text-tertiary, which is the same value in both themes.
+
+      That is structural, not a timing bug. Retiming moves the crossing; it
+      never removes it. And the resting contrast (14 and 11) is itself barely
+      above the ~6 visibility floor, so there is very little room to work in.
+
+    WHAT WAS TRIED, AND WHY NONE OF IT WAS ENOUGH
+      Every number below is measured by the meter in this file (8x slow motion,
+      scaled back to real ms). "washed out" = time the pill is under Δ6.
+
+        shipped (300ms ease-out fade)                       120ms washed out
+        steeper page-fade easing (0.85/0.15)                 31ms
+        steepest (0.95/0.05)                                 19ms
+        shorter fade (200ms) + steep easing                  20ms
+        travel delayed until after the fade                  122ms  ← WORSE
+        pill colour easing lagging the page (best found)       9ms
+
+      The last one works — 13x better, page fade untouched. But look at what
+      it costs: the pill has to hold its OLD theme's colour while the card
+      darkens around it, then catch up. A control that visibly refuses to
+      change theme with everything else, so that a decoration can survive.
+      That is a lot of machinery, and one deliberate visual lie, in service of
+      an animation on a control that is pressed maybe twice in its lifetime.
+
+      Delaying the travel until the fade finishes — the intuitive fix — is
+      measurably the worst option: the wash-out lives INSIDE the fade, so it
+      happens whether the pill moves or not, and a stationary pill flickers
+      where a moving one is at least masked by its own motion.
+
+    THE LESSON WORTH KEEPING
+      The technique itself is sound — see the Locket reference below, and the
+      clip-path fill approach is genuinely better than a translating thumb.
+      It is sound in the app it came from because that nav switches PAGES on a
+      background that never re-themes. Ported onto a THEME switcher it fights
+      the one thing it is sitting on top of. Before porting a motion pattern,
+      check what else is animating on the same click.
+
+  ═══════════════════════════════════════════════════════════════════════════
 
   WHAT IS BEING TUNED
     Two animations fire on one click and they interact:
@@ -227,6 +284,13 @@ pre.out { margin:14px 0 0; padding:12px; border-radius:10px; background:#0E0E10;
 <body>
 
 <h1>Appearance pill — travel × cross-fade tuning</h1>
+<p class="sub" style="color:#F2CE33;border-left:2px solid #F2CE33;padding-left:10px">
+  <b>Rejected — this is not in the product.</b> The sliding pill was removed from
+  Settings.tsx on Aug&nbsp;26, 2026. A travelling indicator and a global theme cross-fade
+  cannot share a click: the pill's contrast against its track inverts between themes, so it
+  passes through zero and disappears mid-move. Full reasoning in the comment at the top of
+  this file's source.
+</p>
 <p class="sub">
   Stage&nbsp;A is what ships today. Stage&nbsp;B is live. Click a segment in either, or
   <b>Run both</b> to fire them together. Δmin is the moment the pill and its track reach the
