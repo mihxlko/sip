@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sip — Appearance pill tuning lab</title>
+
+<!--
+  ────────────────────────────────────────────────────────────────────────────
+  SIP · APPEARANCE PILL / THEME CROSS-FADE TUNING LAB
+  Self-contained. Open directly (file://) — no build step, no network.
+
+  WHAT IS BEING TUNED
+    Two animations fire on one click and they interact:
+      1. the pill TRAVELS to the clicked segment  (~190ms, two edges)
+      2. the whole page CROSS-FADES to the new theme (300ms)
+
+    Stage A holds the shipped values; stage B is live-editable. Click the same
+    segment in both and compare, or hit "Run both" to fire them together.
+
+  THE MEASURED PROBLEM (see the meter under each stage)
+    The pill is DARKER than its track in light (#F1F1F2 on #FFFFFF) and
+    LIGHTER than it in dark (#323338 on #28282C). Two straight interpolations
+    with opposite polarity must cross — so ~130ms into every switch the pill
+    is EXACTLY the colour of its track and disappears. The label inversion
+    goes with it: the fill's label crosses --text-tertiary, which is the same
+    value in both themes.
+
+    Δmin in the meter is that crossing. 0 = the pill vanished completely.
+    Retiming cannot remove the crossing, only change how fast you pass through
+    it — which is what the fade easing control is for. Use the slow-motion
+    control to actually see it.
+
+  WHAT THE LAB SAID (measured at 8× slow motion so the crossing is resolvable;
+  times are scaled back to real ms, "under Δ6" = how long the pill is washed out)
+
+    page fade 300ms, varying the PAGE easing — the obvious lever, and the weak one:
+      ease-out (shipped) 120ms   ease-in-out 88ms   steep 0.85/0.15 31ms
+      steeper 0.95/0.05   19ms   linear     139ms
+      → helps, but it retimes the ENTIRE app's cross-fade to fix one control.
+
+    page fade left alone at 300ms ease-out, varying only the FILL LAYER's easing:
+      same as page (shipped)     118ms
+      steep 0.85/0.15            101ms
+      lag behind the page         (9ms)   ← 13×, and nothing else in the app moves
+      lead the page               34ms
+
+    travel-after-the-fade (start delay 300ms): 122ms — WORSE than shipped. The
+    wash-out lives in the cross-fade, so it happens whether the pill moves or
+    not; stationary, it reads as a flicker instead of being masked by motion.
+
+    Δmin stays ~0 in every configuration. The crossing cannot be removed, only
+    traversed faster — which is the whole point of the lag: it forces the
+    crossing to happen early, while the two colours are still separating fast.
+
+  LOCKET REFERENCE (locket.com nav, measured off the supplied capture at 57fps)
+    travel        ~181ms mean over 10 moves (clean ones: 175 / 175 / 193 /
+                  211 / 228) — i.e. the shipped 190ms is already right
+    stretch       peak width +10–20% mid-travel, so it runs the same two-edge
+                  offset this does
+    label         plain per-label `transition-colors 200ms ease-out`, no
+                  clip-path inversion — it gets away with that because its
+                  pill is a TRANSLUCENT tint over a static background. It
+                  never changes theme, so it has no polarity crossing at all.
+  ────────────────────────────────────────────────────────────────────────────
+-->
+
+<style>
+/* ── sip tokens, scoped to a stage so two themes can co-exist on one page ─── */
+.stage {
+  --white:#FFFFFF; --neutral-25:#F8F8F9; --neutral-50:#F1F1F2; --neutral-75:#EAEAEC;
+  --neutral-400:#8D8F98; --neutral-700:#44454C; --neutral-800:#323338;
+  --neutral-850:#28282C; --neutral-925:#1F2023; --neutral-997:#171719;
+
+  --surface-base:var(--white); --surface-card:var(--neutral-25);
+  --surface-field:var(--white); --surface-selected:var(--neutral-50);
+  --text-primary:var(--neutral-800); --text-secondary:var(--neutral-700);
+  --text-tertiary:var(--neutral-400); --text-muted:#AAABB2;
+}
+.stage[data-theme="dark"] {
+  --surface-base:var(--neutral-997); --surface-card:var(--neutral-925);
+  --surface-field:var(--neutral-850); --surface-selected:var(--neutral-800);
+  --text-primary:var(--neutral-50); --text-secondary:#D4D5D8;
+  --text-tertiary:var(--neutral-400); --text-muted:#71737F;
+}
+
+/* ── the two animatable clip-path edges ──────────────────────────────────── */
+@property --sip-pill-left  { syntax:'<length-percentage>'; inherits:false; initial-value:0%; }
+@property --sip-pill-right { syntax:'<length-percentage>'; inherits:false; initial-value:100%; }
+
+/* Per-stage knobs. Stage A is pinned to the shipped values; stage B is driven
+   by the controls. --slow multiplies every duration so the crossing can be
+   inspected frame by frame. */
+.stage {
+  --travel: 190ms;
+  --lag: 48ms;
+  --lead: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --settle: linear(0, 0.0423, 0.1425, 0.2698, 0.4034, 0.5305, 0.6437, 0.7397, 0.8178, 0.8791, 0.9255, 0.9592, 0.9828, 0.9983, 1.0077, 1.0129, 1.0149, 1.015, 1.0139, 1.0121, 1.0101, 1.0081, 1.0063, 1.0047, 1);
+  --start-delay: 0ms;
+  --fade: 300ms;
+  --fade-ease: ease-out;
+  /* The fill layer's OWN colour easing, independent of the page's. The pill
+     and its track cross because their contrast flips polarity between themes;
+     if the track leads and the pill lags, the crossing is forced early and is
+     traversed fast, instead of drifting through the middle together. */
+  --pill-fade-ease: var(--fade-ease);
+  --slow: 1;
+
+  --t-travel: calc(var(--travel) * var(--slow));
+  --t-lag:    calc((var(--lag) + var(--start-delay)) * var(--slow));
+  --t-start:  calc(var(--start-delay) * var(--slow));
+  --t-fade:   calc(var(--fade) * var(--slow));
+}
+
+/* ── the card ─────────────────────────────────────────────────────────────── */
+.card {
+  display:flex; flex-direction:column; gap:16px; padding:16px;
+  border-radius:16px; background:var(--surface-card);
+}
+.card > .cap { font-size:13px; line-height:1.25; font-weight:600; text-transform:uppercase;
+  letter-spacing:.02em; color:var(--text-muted); }
+.track { position:relative; display:flex; padding:4px; border-radius:12px; background:var(--surface-field); }
+
+.item {
+  flex:1 1 0%; min-width:0; display:flex; align-items:center; justify-content:center;
+  gap:4px; padding:8px 0; font-size:15px; line-height:18px; font-weight:600;
+}
+button.item {
+  cursor:pointer; border:0; appearance:none; outline:none; border-radius:8px;
+  background:var(--surface-field); color:var(--text-tertiary); font-family:inherit;
+  transition:color 150ms ease;
+}
+button.item:not([aria-pressed="true"]):hover { color:var(--text-secondary); }
+
+.sip-pill-fill {
+  position:absolute; inset:4px; display:flex;
+  background:var(--surface-selected);
+  color:var(--text-primary);
+  clip-path:inset(0 var(--sip-pill-right) 0 var(--sip-pill-left) round 8px);
+  pointer-events:none;
+}
+.sip-pill-fill[data-animated="true"][data-direction="forward"] {
+  transition:
+    --sip-pill-right var(--t-travel) var(--lead)   var(--t-start),
+    --sip-pill-left  var(--t-travel) var(--settle) var(--t-lag);
+}
+.sip-pill-fill[data-animated="true"][data-direction="backward"] {
+  transition:
+    --sip-pill-left  var(--t-travel) var(--lead)   var(--t-start),
+    --sip-pill-right var(--t-travel) var(--settle) var(--t-lag);
+}
+
+/* ── the global cross-fade, reproduced exactly (incl. the * !important) ───── */
+.stage[data-transitioning], .stage[data-transitioning] * {
+  transition:
+    color            var(--t-fade) var(--fade-ease),
+    background-color var(--t-fade) var(--fade-ease),
+    border-color     var(--t-fade) var(--fade-ease),
+    box-shadow       var(--t-fade) var(--fade-ease),
+    opacity          var(--t-fade) var(--fade-ease) !important;
+}
+/* …and the higher-specificity override that keeps the travel alive inside it */
+.stage[data-transitioning] .sip-pill-fill[data-animated="true"][data-direction="forward"] {
+  transition:
+    --sip-pill-right var(--t-travel) var(--lead)   var(--t-start),
+    --sip-pill-left  var(--t-travel) var(--settle) var(--t-lag),
+    background-color var(--t-fade) var(--pill-fade-ease),
+    color            var(--t-fade) var(--pill-fade-ease) !important;
+}
+.stage[data-transitioning] .sip-pill-fill[data-animated="true"][data-direction="backward"] {
+  transition:
+    --sip-pill-left  var(--t-travel) var(--lead)   var(--t-start),
+    --sip-pill-right var(--t-travel) var(--settle) var(--t-lag),
+    background-color var(--t-fade) var(--pill-fade-ease),
+    color            var(--t-fade) var(--pill-fade-ease) !important;
+}
+
+/* ── lab chrome ───────────────────────────────────────────────────────────── */
+* { box-sizing:border-box; }
+body {
+  margin:0; padding:28px; background:#0E0E10; color:#C6C7CC;
+  font:14px/1.5 ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+}
+h1 { font-size:17px; margin:0 0 4px; color:#F1F1F2; }
+.sub { margin:0 0 24px; color:#71737F; font-size:13px; max-width:78ch; }
+.stages { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+.stage-wrap { flex:0 0 auto; }
+.stage-hd { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+.stage-hd b { color:#F1F1F2; font-size:13px; }
+.stage-hd span { font-size:11px; color:#71737F; }
+/* 326 = the production 290px control column + this stage's own 18px padding.
+   Travel distance drives perceived speed, so the segments must be the real
+   width or every duration tuned here is tuned against the wrong geometry. */
+.stage { width:326px; padding:18px; border-radius:20px; background:var(--surface-base);
+  font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif; }
+
+.meter { margin-top:10px; padding:10px 12px; border-radius:10px; background:#1C1D20; font-size:12px; }
+.meter canvas { display:block; width:100%; height:52px; margin-top:8px; border-radius:6px; background:#141416; }
+.meter .row { display:flex; justify-content:space-between; gap:8px; }
+.meter .k { color:#71737F; }
+.meter b { color:#F1F1F2; font-variant-numeric:tabular-nums; }
+.bad  { color:#F75951 !important; }
+.warn { color:#F2CE33 !important; }
+.good { color:#00B97D !important; }
+.legend { margin-top:6px; font-size:10px; color:#5A5C65; display:flex; gap:12px; }
+.legend i { display:inline-block; width:8px; height:2px; vertical-align:middle; margin-right:4px; }
+
+.panel { margin-top:24px; padding:16px 18px; border-radius:14px; background:#171719; }
+.panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:#71737F; margin:0 0 14px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px 22px; }
+label.ctl { display:block; font-size:12px; }
+label.ctl .lb { display:flex; justify-content:space-between; color:#8D8F98; margin-bottom:5px; }
+label.ctl .lb b { color:#F1F1F2; font-variant-numeric:tabular-nums; font-weight:600; }
+input[type=range] { width:100%; accent-color:#51A0EA; }
+select { width:100%; background:#28282C; color:#F1F1F2; border:1px solid #333439;
+  border-radius:8px; padding:6px 8px; font:inherit; font-size:12px; }
+.btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+button.act { cursor:pointer; border:1px solid #333439; background:#28282C; color:#F1F1F2;
+  border-radius:999px; padding:7px 14px; font:inherit; font-size:12px; font-weight:600; }
+button.act:hover { background:#323338; }
+button.act.primary { background:#51A0EA; border-color:#51A0EA; color:#0E0E10; }
+pre.out { margin:14px 0 0; padding:12px; border-radius:10px; background:#0E0E10; color:#8D8F98;
+  font:11px/1.6 ui-monospace,Menlo,monospace; white-space:pre-wrap; }
+.note { font-size:11px; color:#5A5C65; margin-top:10px; }
+</style>
+</head>
+<body>
+
+<h1>Appearance pill — travel × cross-fade tuning</h1>
+<p class="sub">
+  Stage&nbsp;A is what ships today. Stage&nbsp;B is live. Click a segment in either, or
+  <b>Run both</b> to fire them together. Δmin is the moment the pill and its track reach the
+  same colour — <b>0 means the pill vanished</b>. Turn slow-motion up to see it happen.
+</p>
+
+<div class="stages" id="stages"></div>
+
+<div class="panel">
+  <h2>Stage B</h2>
+  <div class="grid">
+    <label class="ctl"><span class="lb">Travel duration <b id="l-travel">190ms</b></span>
+      <input type="range" id="c-travel" min="80" max="400" step="10" value="190"></label>
+
+    <label class="ctl"><span class="lb">Trailing-edge lag <b id="l-lag">48ms</b></span>
+      <input type="range" id="c-lag" min="0" max="120" step="4" value="48"></label>
+
+    <label class="ctl"><span class="lb">Travel start delay <b id="l-delay">0ms</b></span>
+      <input type="range" id="c-delay" min="0" max="320" step="10" value="0"></label>
+
+    <label class="ctl"><span class="lb">Settle overshoot <b id="l-bounce">1.5%</b></span>
+      <input type="range" id="c-bounce" min="0" max="8" step="0.5" value="1.5"></label>
+
+    <label class="ctl"><span class="lb">Leading edge easing</span>
+      <select id="c-lead">
+        <option value="cubic-bezier(0.165, 0.84, 0.44, 1)">ease-out-quart (shipped)</option>
+        <option value="cubic-bezier(0.22, 1, 0.36, 1)">ease-out-quint</option>
+        <option value="cubic-bezier(0.16, 1, 0.3, 1)">ease-out-expo</option>
+        <option value="cubic-bezier(0.33, 1, 0.68, 1)">ease-out-cubic</option>
+        <option value="ease-out">ease-out (browser)</option>
+        <option value="linear">linear</option>
+      </select></label>
+
+    <label class="ctl"><span class="lb">Cross-fade duration <b id="l-fade">300ms</b></span>
+      <input type="range" id="c-fade" min="80" max="600" step="20" value="300"></label>
+
+    <label class="ctl"><span class="lb">Cross-fade easing</span>
+      <select id="c-fadeease">
+        <option value="ease-out">ease-out (shipped)</option>
+        <option value="cubic-bezier(0.85, 0, 0.15, 1)">steep middle — 0.85/0.15</option>
+        <option value="cubic-bezier(0.95, 0, 0.05, 1)">steeper middle — 0.95/0.05</option>
+        <option value="ease-in-out">ease-in-out</option>
+        <option value="linear">linear</option>
+      </select></label>
+
+    <label class="ctl"><span class="lb">Pill colour easing</span>
+      <select id="c-pillease">
+        <option value="">same as page (shipped)</option>
+        <option value="cubic-bezier(0.85, 0, 0.15, 1)">steep middle — 0.85/0.15</option>
+        <option value="cubic-bezier(0.7, 0, 1, 0.5)">lag behind the page — ease-in</option>
+        <option value="cubic-bezier(0.9, 0, 1, 0.3)">lag hard</option>
+        <option value="cubic-bezier(0, 0.7, 0.3, 1)">lead the page — ease-out</option>
+      </select></label>
+
+    <label class="ctl"><span class="lb">Slow motion <b id="l-slow">1×</b></span>
+      <input type="range" id="c-slow" min="1" max="12" step="1" value="1"></label>
+  </div>
+
+  <div class="btns">
+    <button class="act primary" id="run">Run both</button>
+    <button class="act" id="cycle">Cycle B (sys→light→dark)</button>
+    <button class="act" data-preset="shipped">Preset: shipped</button>
+    <button class="act" data-preset="fast-fade">Preset: fast-crossing fade</button>
+    <button class="act" data-preset="locket">Preset: Locket-matched</button>
+    <button class="act" data-preset="delayed">Preset: travel after fade</button>
+    <button class="act" data-preset="lag">Preset: pill lags the page</button>
+    <button class="act" id="copy">Copy B as CSS</button>
+  </div>
+
+  <pre class="out" id="out"></pre>
+  <p class="note">
+    Δ is the mean absolute per-channel distance in sRGB. “pill/track” is the fill layer against the
+    track behind it; “label” is the fill’s label against the two inactive ones. Anything under ~6
+    reads as washed out on a real display; 0 is invisible.
+  </p>
+</div>
+
+<script>
+const THEMES = ['system','light','dark'];
+const LABEL  = { system:'System', light:'Light', dark:'Dark' };
+
+const ICON = {
+  system:`<svg width="18" height="18" viewBox="0 0 28.8 28.8" fill="none" style="flex:none">
+    <path d="M25.2 8.402v12c0 3.6-1.8 6-6 6H9.6c-4.2 0-6-2.4-6-6V8.402c0-3.6 1.8-6 6-6h9.6c4.2 0 6 2.4 6 6Z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="7.2" y="6.002" width="14.4" height="7.2" rx="1.75" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12.36 18.362l-2.76 2.76m0-2.76l2.76 2.76" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  light:`<svg width="18" height="18" viewBox="0 6.383 18 18" fill="none" style="flex:none">
+    <circle cx="9" cy="15" r="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M9 7.5v1.5M9 21v1.5M3.697 9.697l1.058 1.058M13.245 19.245l1.058 1.057M1.5 15h1.5M15 15h1.5M4.755 19.245l-1.057 1.057M14.303 9.697l-1.058 1.058" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  dark:`<svg width="18" height="18" viewBox="-1.5 -1.3 28.8 28.8" fill="none" style="flex:none">
+    <path d="M1.694 14.063c0.416 5.767 5.47 10.459 11.519 10.716 4.267 0.179 8.084-1.747 10.373-4.781 0.948-1.243 0.439-2.072-1.145-1.791-0.775 0.134-1.573 0.19-2.405 0.156-5.655-0.224-10.281-4.804-10.304-10.212-0.012-1.456 0.301-2.833 0.867-4.087 0.624-1.389-0.127-2.049-1.573-1.456C4.447 4.478 1.313 8.946 1.694 14.063Z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+};
+
+/* Damped oscillator sampled into linear(). Same generator the shipped
+   --sip-pill-settle came out of; overshoot % drives the damping ratio. */
+function spring(overshootPct) {
+  if (overshootPct <= 0.01) return 'cubic-bezier(0.33, 1, 0.68, 1)';
+  const os = overshootPct / 100;
+  const z  = Math.min(0.995, 1 / Math.sqrt(1 + Math.PI ** 2 / Math.log(os) ** 2));
+  const wn = 40, wd = wn * Math.sqrt(1 - z * z), T = 0.19, N = 24;
+  const y = t => 1 - Math.exp(-z * wn * t) * (Math.cos(wd * t) + (z * wn / wd) * Math.sin(wd * t));
+  const pts = Array.from({ length: N + 1 }, (_, i) => y(T * i / N));
+  pts[N] = 1;
+  return 'linear(' + pts.map(v => +v.toFixed(4)).join(', ') + ')';
+}
+
+/* ── a stage: the Appearance card + a live wash-out meter ─────────────────── */
+function makeStage(id, title, note) {
+  const wrap = document.createElement('div');
+  wrap.className = 'stage-wrap';
+  wrap.innerHTML = `
+    <div class="stage-hd"><b>${title}</b><span>${note}</span></div>
+    <div class="stage" data-theme="light">
+      <div class="card">
+        <span class="cap">Appearance</span>
+        <div class="track">
+          ${THEMES.map(t => `<button class="item" data-theme-btn="${t}" aria-pressed="${t==='system'}">${ICON[t]}<span>${LABEL[t]}</span></button>`).join('')}
+          <div class="sip-pill-fill" aria-hidden="true" data-animated="false" data-direction="forward">
+            ${THEMES.map(t => `<span class="item">${ICON[t]}<span>${LABEL[t]}</span></span>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="meter" style="width:326px">
+      <div class="row"><span class="k">Δmin pill / track</span><b id="${id}-dbg">–</b></div>
+      <div class="row"><span class="k">Δmin label</span><b id="${id}-dlb">–</b></div>
+      <div class="row"><span class="k">washed-out for</span><b id="${id}-win">–</b></div>
+      <canvas id="${id}-cv" width="600" height="104"></canvas>
+      <div class="legend"><span><i style="background:#51A0EA"></i>pill/track</span>
+        <span><i style="background:#F2CE33"></i>label</span>
+        <span><i style="background:#F75951"></i>Δ = 6 floor</span></div>
+    </div>`;
+
+  const stage = wrap.querySelector('.stage');
+  const fill  = wrap.querySelector('.sip-pill-fill');
+  const track = wrap.querySelector('.track');
+  const btns  = [...wrap.querySelectorAll('[data-theme-btn]')];
+  const st = { wrap, stage, fill, track, btns, theme:'system', prev:null, timer:0, id };
+
+  btns.forEach(b => b.addEventListener('click', () => setTheme(st, b.dataset.themeBtn)));
+  measure(st);
+  new ResizeObserver(() => measure(st)).observe(track);
+  return st;
+}
+
+function measure(st) {
+  const active = st.btns.find(b => b.dataset.themeBtn === st.theme);
+  const layer = st.fill.getBoundingClientRect(), item = active.getBoundingClientRect();
+  if (!layer.width) return;
+  const left = item.left - layer.left, right = layer.right - item.right;
+  if (st.prev && st.prev.left === left && st.prev.right === right) return;
+  st.fill.dataset.direction = st.prev && left < st.prev.left ? 'backward' : 'forward';
+  st.fill.style.setProperty('--sip-pill-left', left + 'px');
+  st.fill.style.setProperty('--sip-pill-right', right + 'px');
+  st.prev = { left, right };
+}
+
+function setTheme(st, theme) {
+  if (theme === st.theme) return;
+  st.theme = theme;
+  st.btns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeBtn === theme)));
+
+  const slow = +getComputedStyle(st.stage).getPropertyValue('--slow') || 1;
+  const fadeMs = parseFloat(getComputedStyle(st.stage).getPropertyValue('--fade')) * slow;
+  const travelMs = parseFloat(getComputedStyle(st.stage).getPropertyValue('--travel')) * slow;
+  const delayMs = parseFloat(getComputedStyle(st.stage).getPropertyValue('--start-delay')) * slow;
+
+  st.fill.dataset.animated = 'true';
+  st.stage.dataset.transitioning = '';
+  clearTimeout(st.timer);
+  const window_ = Math.max(fadeMs, travelMs + delayMs) + 60 * slow;
+  st.timer = setTimeout(() => {
+    delete st.stage.dataset.transitioning;
+    st.fill.dataset.animated = 'false';
+  }, window_);
+
+  // theme flip + re-measure land in the same frame, as in production
+  st.stage.dataset.theme = theme === 'system' ? 'light' : theme;
+  measure(st);
+  sample(st, window_);
+}
+
+/* ── wash-out meter ───────────────────────────────────────────────────────── */
+const px = s => (s.match(/\d+/g) || [0,0,0]).slice(0,3).map(Number);
+const dist = (a,b) => { const x = px(a), y = px(b);
+  return (Math.abs(x[0]-y[0]) + Math.abs(x[1]-y[1]) + Math.abs(x[2]-y[2])) / 3; };
+
+function sample(st, windowMs) {
+  const cv = document.getElementById(st.id + '-cv'), g = cv.getContext('2d');
+  const fillLabel = st.fill.querySelector('span'), offBtn = st.btns[st.theme === 'system' ? 1 : 0];
+  const series = [], t0 = performance.now();
+  let minBg = 999, minLb = 999, washFrames = 0;
+
+  (function tick() {
+    const t = performance.now() - t0;
+    const cs = getComputedStyle, f = cs(st.fill);
+    const dbg = dist(f.backgroundColor, cs(st.track).backgroundColor);
+    const dlb = dist(cs(fillLabel).color, cs(offBtn).color);
+    series.push([t, dbg, dlb]);
+    minBg = Math.min(minBg, dbg); minLb = Math.min(minLb, dlb);
+    if (dbg < 6) washFrames++;
+    if (t < windowMs) requestAnimationFrame(tick); else done();
+  })();
+
+  function done() {
+    const span = series.length ? series[series.length-1][0] : 1;
+    const washMs = Math.round(washFrames / series.length * span);
+    const cls = v => v < 2 ? 'bad' : v < 6 ? 'warn' : 'good';
+    const set = (k, v, c) => { const el = document.getElementById(st.id + '-' + k);
+      el.textContent = v; el.className = c || ''; };
+    set('dbg', minBg.toFixed(1), cls(minBg));
+    set('dlb', minLb.toFixed(1), cls(minLb));
+    set('win', washMs + 'ms', washMs > 30 ? 'bad' : washMs > 10 ? 'warn' : 'good');
+
+    g.clearRect(0,0,cv.width,cv.height);
+    const YMAX = 60, X = t => t / span * cv.width, Y = v => cv.height - Math.min(v,YMAX)/YMAX*cv.height;
+    g.strokeStyle = '#F75951'; g.setLineDash([3,3]); g.beginPath();
+    g.moveTo(0, Y(6)); g.lineTo(cv.width, Y(6)); g.stroke(); g.setLineDash([]);
+    for (const [i, col] of [[1,'#51A0EA'],[2,'#F2CE33']]) {
+      g.strokeStyle = col; g.lineWidth = 2; g.beginPath();
+      series.forEach(([t,,], k) => {
+        const v = series[k][i];
+        k ? g.lineTo(X(t), Y(v)) : g.moveTo(X(t), Y(v));
+      });
+      g.stroke();
+    }
+  }
+}
+
+/* ── wire up ──────────────────────────────────────────────────────────────── */
+const A = makeStage('a', 'A — shipped', '190ms travel · 300ms ease-out fade');
+const B = makeStage('b', 'B — live', 'edit below');
+document.getElementById('stages').append(A.wrap, B.wrap);
+
+const C = {
+  travel: document.getElementById('c-travel'), lag: document.getElementById('c-lag'),
+  delay: document.getElementById('c-delay'), bounce: document.getElementById('c-bounce'),
+  lead: document.getElementById('c-lead'), fade: document.getElementById('c-fade'),
+  fadeease: document.getElementById('c-fadeease'), pillease: document.getElementById('c-pillease'),
+  slow: document.getElementById('c-slow'),
+};
+
+function apply() {
+  const s = B.stage.style;
+  s.setProperty('--travel', C.travel.value + 'ms');
+  s.setProperty('--lag', C.lag.value + 'ms');
+  s.setProperty('--start-delay', C.delay.value + 'ms');
+  s.setProperty('--settle', spring(+C.bounce.value));
+  s.setProperty('--lead', C.lead.value);
+  s.setProperty('--fade', C.fade.value + 'ms');
+  s.setProperty('--fade-ease', C.fadeease.value);
+  s.setProperty('--pill-fade-ease', C.pillease.value || C.fadeease.value);
+  s.setProperty('--slow', C.slow.value);
+  A.stage.style.setProperty('--slow', C.slow.value);   // slow-mo applies to both
+
+  document.getElementById('l-travel').textContent = C.travel.value + 'ms';
+  document.getElementById('l-lag').textContent    = C.lag.value + 'ms';
+  document.getElementById('l-delay').textContent  = C.delay.value + 'ms';
+  document.getElementById('l-bounce').textContent = (+C.bounce.value).toFixed(1) + '%';
+  document.getElementById('l-fade').textContent   = C.fade.value + 'ms';
+  document.getElementById('l-slow').textContent   = C.slow.value + '×';
+  document.getElementById('out').textContent = cssOut();
+}
+
+function cssOut() {
+  return `--sip-pill-lead:   ${C.lead.value};
+--sip-pill-settle: ${spring(+C.bounce.value)};
+
+/* travel */   ${C.travel.value}ms   /* trailing lag */ ${C.lag.value}ms   /* start delay */ ${C.delay.value}ms
+/* fade */     ${C.fade.value}ms ${C.fadeease.value}
+/* pill fade */ ${C.pillease.value || '(same as page)'}`;
+}
+
+Object.values(C).forEach(el => el.addEventListener('input', apply));
+
+const PRESETS = {
+  shipped:    { travel:190, lag:48, delay:0,   bounce:1.5, lead:0, fade:300, fadeease:0, pillease:0 },
+  'fast-fade':{ travel:190, lag:48, delay:0,   bounce:1.5, lead:0, fade:300, fadeease:1, pillease:0 },
+  locket:     { travel:180, lag:20, delay:0,   bounce:1.0, lead:1, fade:220, fadeease:1, pillease:0 },
+  delayed:    { travel:190, lag:48, delay:300, bounce:1.5, lead:0, fade:300, fadeease:0, pillease:0 },
+  lag:        { travel:190, lag:48, delay:0,   bounce:1.5, lead:0, fade:300, fadeease:0, pillease:2 },
+};
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+  const p = PRESETS[b.dataset.preset];
+  C.travel.value = p.travel; C.lag.value = p.lag; C.delay.value = p.delay;
+  C.bounce.value = p.bounce; C.lead.selectedIndex = p.lead;
+  C.fade.value = p.fade; C.fadeease.selectedIndex = p.fadeease;
+  C.pillease.selectedIndex = p.pillease ?? 0;
+  apply();
+}));
+
+document.getElementById('run').addEventListener('click', () => {
+  const next = A.theme === 'dark' ? 'light' : 'dark';
+  setTheme(A, next); setTheme(B, next);
+});
+document.getElementById('cycle').addEventListener('click', () => {
+  const order = ['system','light','dark'];
+  let i = 0;
+  const step = () => {
+    setTheme(B, order[i % 3]); i++;
+    if (i < 4) setTimeout(step, 700 * (+C.slow.value));
+  };
+  step();
+});
+document.getElementById('copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(cssOut()); } catch {}
+});
+
+apply();
+</script>
+</body>
+</html>
