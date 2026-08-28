@@ -58,6 +58,36 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
   // screen in tailwind.config.ts and the media query in toast-styles.css.
   const [stacked, setStacked] = useState(false)
 
+  // Press feedback for touch. See .btn-press in tokens.css for why :active
+  // cannot carry this on its own. Delegated on the document so every
+  // .btn-press picks it up — Test, the bottle thumbs, the colour swatches and
+  // the Appearance segments — with no per-button wiring.
+  //
+  // pointercancel is the one that matters on a phone: it fires when the
+  // browser takes the gesture over for scrolling, which is exactly when the
+  // button must let go rather than stay stuck at 0.96.
+  useEffect(() => {
+    let pressed: Element | null = null
+    const down = (e: PointerEvent) => {
+      const el = (e.target as Element | null)?.closest?.('.btn-press')
+      if (!el) return
+      pressed = el
+      el.setAttribute('data-pressed', '')
+    }
+    const release = () => {
+      pressed?.removeAttribute('data-pressed')
+      pressed = null
+    }
+    document.addEventListener('pointerdown', down, true)
+    document.addEventListener('pointerup', release, true)
+    document.addEventListener('pointercancel', release, true)
+    return () => {
+      document.removeEventListener('pointerdown', down, true)
+      document.removeEventListener('pointerup', release, true)
+      document.removeEventListener('pointercancel', release, true)
+    }
+  }, [])
+
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 659px)')
     const sync = () => setStacked(mq.matches)
