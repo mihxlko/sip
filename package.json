@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "sync-dark-tokens": "node scripts/sync-dark-tokens.js",
+    "check-tokens": "node scripts/sync-dark-tokens.js --check",
     "release": "node scripts/release.js"
   },
   "devDependencies": {
