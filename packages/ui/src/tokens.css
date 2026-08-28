@@ -4,6 +4,49 @@
    constants and never need to change between themes.
    ─────────────────────────────────────────────────────────────────────── */
 
+/* ─── typeface ──────────────────────────────────────────────────────────────
+   SF Pro Rounded, self-hosted. It has to be self-hosted: Safari refuses every
+   locally-installed family for web content (a fingerprinting defence), so the
+   old named-only stack resolved to Times, fell through to sans-serif, and
+   shipped Helvetica to every Safari visitor. Naming the family in @font-face
+   makes it OUR font rather than a local lookup, which is the whole fix —
+   Safari has never had a problem serving webfonts.
+
+   Subset to the Google-Fonts "latin" range, 68 KB across three weights. Only
+   400/500/600 exist because only font-normal/-medium/-semibold are used; if a
+   font-bold ever lands, its face has to be generated here or the browser will
+   synthesise a fake bold from 600.
+
+   The `/fonts/…` path resolves for both consumers: Next serves apps/web/public
+   at the origin root, and the extension's chrome-extension:// pages resolve it
+   against their own root. The content-script toast cannot use this rule at all
+   — it injects into a third-party page inside a shadow root, where @font-face
+   is ignored and a root-relative URL would hit the host's origin — so it
+   registers these same files through chrome.runtime.getURL() instead. See
+   apps/extension/src/content/index.tsx.
+   ─────────────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: "SF Pro Rounded";
+  src: url("/fonts/SF-Pro-Rounded-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SF Pro Rounded";
+  src: url("/fonts/SF-Pro-Rounded-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SF Pro Rounded";
+  src: url("/fonts/SF-Pro-Rounded-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
 
   /* ── primitive: neutrals ─────────────────────────────────────────────── */
@@ -118,7 +161,12 @@
   --color-button: var(--surface-primary);
 
   /* ── typography ─────────────────────────────────────────────────────── */
-  --font-sans: "SF Pro Rounded", sans-serif;
+  /* "SF Pro Rounded" here resolves to the @font-face at the top of this file,
+     never to a local lookup. `ui-rounded` sits second as the failed-fetch net:
+     on Apple platforms it is the system rounded face, so a dropped woff2
+     degrades rounded-to-rounded instead of falling to Helvetica. The tail
+     after it is the honest non-rounded floor for everyone else. */
+  --font-sans: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   --text-sm: 13px;
   --text-md: 15px;
