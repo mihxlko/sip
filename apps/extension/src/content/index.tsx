@@ -38,6 +38,25 @@ function mountToast(prefs: SipPrefs) {
   ].join(';')
   toastEl.setAttribute('data-theme', resolveTheme(prefs.theme))
 
+  // WCAG 4.1.3 Status Messages. The toast appears without taking focus, so
+  // with no live region a screen reader user is told nothing at all — it is
+  // simply invisible to them. Settings' Test button never had this problem
+  // because Sonner wraps its own toasts in an aria-live region, so the two
+  // surfaces behaved differently and only one of them was wrong.
+  //
+  // role="status" already implies aria-live="polite" and aria-atomic="true".
+  // Both are spelled out anyway: older screen readers do not reliably infer
+  // them, and atomic is what makes the toast read as one announcement rather
+  // than title, message and button as three fragments.
+  //
+  // On the HOST, in the light DOM — not on a node inside the shadow root. The
+  // shadow content flattens into the host's subtree in the accessibility tree,
+  // so a region declared out here covers it without depending on assistive
+  // tech tracking live regions across a shadow boundary.
+  toastEl.setAttribute('role', 'status')
+  toastEl.setAttribute('aria-live', 'polite')
+  toastEl.setAttribute('aria-atomic', 'true')
+
   const shadow = toastEl.attachShadow({ mode: 'open' })
 
   const styleEl = document.createElement('style')
@@ -52,6 +71,11 @@ function mountToast(prefs: SipPrefs) {
   container.className = 'sip-toast-host'
   shadow.appendChild(container)
 
+  // Order is load-bearing for the live region above: announcements fire on
+  // mutation, so the host has to be in the document and EMPTY before the toast
+  // content lands. A region that arrives already populated announces nothing.
+  // createRoot().render() commits in a later task, which is what opens that
+  // gap — verified rather than assumed.
   document.documentElement.appendChild(toastEl)
 
   toastRoot = createRoot(container)
