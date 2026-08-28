@@ -23,19 +23,31 @@ export interface SipPrefs {
   bottleType:      BottleType
   bottleColor:     BottleColor
   titleText:       string       // max 100 chars
-  // 85, not an arbitrary round number: at the 360px floor the mobile variant
-  // gives the message a 250px column, and 85 characters of realistic text is
-  // what fits two lines there (measured, not estimated). Past that the
-  // line-clamp truncates rather than growing the toast, so this is the point
-  // where text starts disappearing silently.
+  // 80, and it is the FALLBACK font that sets it, not the real one. At the
+  // 360px floor the message column is 250px, and the two-line capacity there
+  // depends on what is actually rendering:
   //
-  // Re-measure this if the right rail or the 360px floor moves — it tracks
-  // the column, and the column is what those two decide.
+  //   SF Pro Rounded loaded   85
+  //   ui-rounded / system-ui  80   <- binding
+  //   Segoe UI / Roboto       82
+  //   sans-serif              82
+  //
+  // Sizing to 85 would have been correct only while the webfont is in hand.
+  // registerToastFonts() in the content script notes that a host page's CSP
+  // can block chrome-extension:// font URLs outright, in which case the toast
+  // renders in the fallback for its whole lifetime — and font-display:swap
+  // means even a successful load paints the fallback first. On those pages an
+  // 85-character message wraps to three lines and the line-clamp eats the
+  // third, silently.
+  //
+  // 80 is the narrowest fallback's capacity, so the message fits whichever
+  // face wins. Re-measure if the rail, the 360px floor, or the fallback stack
+  // moves — all three feed the column, and the column is the whole input.
   //
   // The Settings form caps its own input at 60, which is a product choice and
   // already well inside this. This limit is what guards prefs written by
   // anything other than that form.
-  messageText:     string       // max 85 chars
+  messageText:     string       // max 80 chars
   intervalMinutes: number
   theme:           Theme
 }
@@ -57,7 +69,7 @@ export function sanitizePrefs(updates: Partial<SipPrefs>): Partial<SipPrefs> {
   }
 
   if (out.messageText !== undefined) {
-    out.messageText = out.messageText.slice(0, 85)
+    out.messageText = out.messageText.slice(0, 80)
   }
 
   if (out.intervalMinutes !== undefined) {
