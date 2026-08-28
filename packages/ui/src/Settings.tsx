@@ -22,6 +22,9 @@ const COLOR_ORDER: BottleColor[] = [
 ]
 const TYPE_ORDER: BottleType[] = [BottleType.Classic, BottleType.Wide, BottleType.Sport]
 
+const THEME_ORDER = ['system', 'light', 'dark'] as const
+const THEME_LABEL = { system: 'System', light: 'Light', dark: 'Dark' } as const
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 // "1 Hour 30 Minutes" / "15 Minutes" / "2 Hours". Singular/plural per unit, and
@@ -481,16 +484,35 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                            column width. Any fixed radius would read as a
                            different shape at 38px than at 49px; 9999px always
                            resolves to a circle. */
-                        className="btn-press cursor-pointer relative flex-1 min-w-0 aspect-square rounded-full overflow-clip shadow-subtle appearance-none p-0 outline-none border-0"
+                        /* container-type is for the ring below, which is sized
+                           in cqw off this button. */
+                        className="btn-press cursor-pointer relative flex-1 min-w-0 aspect-square rounded-full overflow-clip shadow-subtle appearance-none p-0 outline-none border-0 [container-type:inline-size]"
                         style={{ backgroundColor: BOTTLE_COLORS[color] }}
                       >
-                        {/* The design ships no selected state for these. A ring
-                            would collide with the 6px gaps, so selection lives
-                            inside the swatch — white, with a soft shadow so it
-                            survives on yellow as well as on purple. */}
+                        {/* Selected state, per the Aug 25 spec: a fill-less
+                            ring — 28px across with a 6px stroke — centred in
+                            the swatch. The stroke is --surface-card, so it
+                            reads as a hole punched through the swatch down to
+                            the card behind it. That is what lets it carry the
+                            state with no shadow or halo: it is never "white on
+                            yellow", it is always exactly the surface it sits
+                            on, in either theme (#F8F8F9 light, #1F2023 dark).
+
+                            cqw, not px, for the same reason the radius is
+                            rounded-full: the swatch is flex-1 and aspect-square,
+                            so it is 38px beside a 290px column and ~49px on a
+                            stacked phone. 73.7/16cqw resolves to 28px and 6px
+                            at 38px and keeps the proportion everywhere else,
+                            instead of shrinking to a dot as the swatch grows.
+                            Both are nudged UP off the exact ratio on purpose:
+                            Chrome FLOORS a used border-width to whole pixels,
+                            so aiming dead-on at 6.00 can land on 5 and lose a
+                            sixth of the stroke. Drawing the ring INSIDE the
+                            swatch is also what keeps it free: an outer ring
+                            would need room the 6px gaps do not have. */}
                         {prefs.bottleColor === color && (
-                          <span className="absolute inset-0 flex items-center justify-center text-white [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.35))]">
-                            <CheckIcon />
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="size-[73.7cqw] rounded-full border-[16cqw] border-solid border-surface-card" />
                           </span>
                         )}
                       </button>
@@ -552,8 +574,21 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                   8px (repo rounded-sm). Those three are not independent: an
                   inset child's radius should be the parent's minus the padding
                   (12 − 4 = 8) or the two curves run non-concentric. */}
+              {/* Three buttons. The selection does NOT travel between them, and
+                  that is a decision, not an omission — see
+                  prototypes/appearance-pill.html, which is the built-and-
+                  measured version of the sliding pill and the record of why it
+                  was removed. Short version: the selected pill is darker than
+                  its track in light and lighter than it in dark, so its
+                  contrast has to pass through zero somewhere in the 300ms theme
+                  cross-fade. A selection indicator that goes invisible while
+                  moving is worse than one that does not move, and the only fix
+                  that measured well needed the pill to visibly refuse to change
+                  theme with the rest of the app. An instant swap has none of
+                  that: it is over before the fade is anywhere near the
+                  crossing. */}
               <div className="flex p-1 rounded-lg bg-surface-field">
-                {(['system', 'light', 'dark'] as const).map(theme => (
+                {THEME_ORDER.map(theme => (
                   <button
                     key={theme}
                     onClick={() => changeTheme(theme)}
@@ -580,7 +615,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
                     }`}
                   >
                     <ThemeIcon theme={theme} />
-                    <span>{theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark'}</span>
+                    <span>{THEME_LABEL[theme]}</span>
                   </button>
                 ))}
               </div>
@@ -698,14 +733,6 @@ export function XIcon({ size = 10 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 8 8" fill="currentColor">
       <path d="M6.8 7.6L0.4 1.2C0.181 0.981 0.181 0.619 0.4 0.4C0.619 0.181 0.981 0.181 1.2 0.4L7.6 6.8C7.819 7.019 7.819 7.381 7.6 7.6C7.381 7.819 7.019 7.819 6.8 7.6Z" />
       <path d="M0.4 7.6C0.181 7.381 0.181 7.019 0.4 6.8L6.8 0.4C7.019 0.181 7.381 0.181 7.6 0.4C7.819 0.619 7.819 0.981 7.6 1.2L1.2 7.6C0.981 7.819 0.619 7.819 0.4 7.6Z" />
-    </svg>
-  )
-}
-
-function CheckIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M9.86 18a1 1 0 0 1-.73-.32l-4.86-5.17a1 1 0 1 1 1.46-1.37l4.12 4.39 8.41-9.2a1 1 0 1 1 1.48 1.34l-9.14 10a1 1 0 0 1-.73.33z" />
     </svg>
   )
 }
