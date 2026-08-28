@@ -8,6 +8,13 @@
    --surface-base stayed #FBFBFB here and overrode the new white page. Keep the
    shared semantic names in step, or narrow this block to only what the toast
    actually needs.
+
+   `npm run check-tokens` enforces that for the tokens listed in SHARED_TOKENS
+   in scripts/sync-dark-tokens.js — currently just --font-sans, where a
+   mismatch would silently give the toast a different typeface from the rest of
+   the app. `npm run sync-dark-tokens` rewrites them from tokens.css. Everything
+   else in this block is still on the honour system; add it to that list when it
+   bites.
    ─────────────────────────────────────────────────────────────────────────── */
 
 :root,
