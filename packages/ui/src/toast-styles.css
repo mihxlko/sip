@@ -407,8 +407,9 @@
    text-tertiary, not text-muted: muted is neutral-300 in light and neutral-500
    in dark, so the message read washed out on light and dim on dark. Tertiary
    is neutral-400 in BOTH themes, which darkens it on light and lifts it on
-   dark — one value, more contrast in each. The close × stays muted; it is
-   chrome, not content.                                                       */
+   dark — one value, more contrast in each. The close × takes the same token:
+   at text-muted it was 2.29:1 against the light surface, under the 3:1 that
+   WCAG 1.4.11 asks of a UI component's graphics.                             */
 .sip-toast-message {
   --sip-message-line: 16px;
   margin: 0;
@@ -439,7 +440,7 @@
 
 /* close × button
    Maps: cursor-pointer bg-transparent border-0 outline-none
-         appearance-none shrink-0 p-xs text-text-muted
+         appearance-none shrink-0 p-xs text-text-tertiary
 
    The box is exactly as tall as the title's line box and the glyph centres
    inside it, so the × sits on the title's optical centre. `padding: 4px` used
@@ -459,7 +460,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-family: inherit;
 }
 
