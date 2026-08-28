@@ -217,17 +217,6 @@
   --box-shadow-subtle:  0px 1px 4px 0px rgba(0, 0, 0, 0.03);
   --box-shadow-default: 0px 2px 10px 0px rgba(0, 0, 0, 0.05);
   --box-shadow-strong:  0px 4px 10px 0px rgba(0, 0, 0, 0.05);
-
-  /* ── primitive: shimmer ────────────────────────────────────────────── */
-  --shimmer-hue-min: 0deg;
-  --shimmer-hue-max: 25deg;
-  --shimmer-hue-duration: 6s;
-
-  --shimmer-overlay-opacity-min: 0.03;
-  --shimmer-overlay-opacity-max: 0.12;
-  --shimmer-overlay-duration: 4s;
-
-  --shimmer-ease: ease-in-out;
 }
 
 /* ── explicit light theme ─────────────────────────────────────────────────── */
