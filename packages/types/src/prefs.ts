@@ -23,7 +23,19 @@ export interface SipPrefs {
   bottleType:      BottleType
   bottleColor:     BottleColor
   titleText:       string       // max 100 chars
-  messageText:     string       // max 120 chars
+  // 85, not an arbitrary round number: at the 360px floor the mobile variant
+  // gives the message a 250px column, and 85 characters of realistic text is
+  // what fits two lines there (measured, not estimated). Past that the
+  // line-clamp truncates rather than growing the toast, so this is the point
+  // where text starts disappearing silently.
+  //
+  // Re-measure this if the right rail or the 360px floor moves — it tracks
+  // the column, and the column is what those two decide.
+  //
+  // The Settings form caps its own input at 60, which is a product choice and
+  // already well inside this. This limit is what guards prefs written by
+  // anything other than that form.
+  messageText:     string       // max 85 chars
   intervalMinutes: number
   theme:           Theme
 }
@@ -45,7 +57,7 @@ export function sanitizePrefs(updates: Partial<SipPrefs>): Partial<SipPrefs> {
   }
 
   if (out.messageText !== undefined) {
-    out.messageText = out.messageText.slice(0, 120)
+    out.messageText = out.messageText.slice(0, 85)
   }
 
   if (out.intervalMinutes !== undefined) {

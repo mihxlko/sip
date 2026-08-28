@@ -21,8 +21,19 @@ function mountToast(prefs: SipPrefs) {
   cleanupToast()
 
   toastEl = document.createElement('div')
+  // Anchored on BOTH sides, not just the right. The host is the full gutter-to-
+  // gutter band and the toast right-aligns inside it, so above 482px it sits
+  // top-right at 450px and below that it fills the band instead of overflowing
+  // the viewport — which is what a right-only anchor did.
+  //
+  // env() only resolves to a real inset when the host page opts in with
+  // viewport-fit=cover, which most pages do not; max() makes it a no-op at 16px
+  // everywhere else. It costs nothing and it is correct on the pages that do.
   toastEl.style.cssText = [
-    'position:fixed', 'top:16px', 'right:16px',
+    'position:fixed',
+    'top:max(16px, env(safe-area-inset-top))',
+    'left:max(16px, env(safe-area-inset-left))',
+    'right:max(16px, env(safe-area-inset-right))',
     'z-index:2147483647', 'pointer-events:none',
   ].join(';')
   toastEl.setAttribute('data-theme', resolveTheme(prefs.theme))
@@ -33,7 +44,12 @@ function mountToast(prefs: SipPrefs) {
   styleEl.textContent = toastStyles
   shadow.appendChild(styleEl)
 
+  // Alignment is a class, not an inline style: .sip-toast-host carries a media
+  // query that centres the toast once the UI stacks, and an inline style would
+  // win over it. The class lives in the shared sheet; the Settings preview
+  // never uses it, so its scope stays centred by its own pane.
   const container = document.createElement('div')
+  container.className = 'sip-toast-host'
   shadow.appendChild(container)
 
   document.documentElement.appendChild(toastEl)
