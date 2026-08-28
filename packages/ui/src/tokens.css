@@ -17,6 +17,27 @@
    font-bold ever lands, its face has to be generated here or the browser will
    synthesise a fake bold from 600.
 
+   font-display:swap, and the preloads in apps/web layout.tsx are what make it
+   behave. Preload starts the fetch at head-parse (~49ms, measured) instead of
+   after globals.css is parsed and laid out (~372ms), which puts the font ahead
+   of first paint (~420ms) for anything under roughly 350-400ms of latency —
+   i.e. most visitors never see a swap at all. Past that they get a brief
+   fallback and then the real face.
+
+   `optional` was tried and reverted. It does guarantee no swap, but the way it
+   buys that is by abandoning the font for the whole page load when it misses a
+   short block window: measured in real Safari 26.5 and real Chrome 151, WITH
+   preload, both kept the fallback at 300ms latency and above. On Chrome that
+   fallback is system-ui, because Chrome ignores ui-rounded — so a first-time
+   visitor on a slow link would have seen San Francisco and none of this
+   typeface at all. Ending up in the right face is worth a brief swap.
+
+   Inlining the woff2 as base64 was also considered and rejected: base64 of an
+   already-brotli-compressed woff2 does not re-compress (measured 24,156 B raw
+   -> 24,371 B base64+gzip), so it moves the full weight onto the render-
+   blocking path for nothing, and inlining one weight leaves the equally-used
+   500 on the network — a mixed-typeface page is worse than a uniform fallback.
+
    The `/fonts/…` path resolves for both consumers: Next serves apps/web/public
    at the origin root, and the extension's chrome-extension:// pages resolve it
    against their own root. The content-script toast cannot use this rule at all

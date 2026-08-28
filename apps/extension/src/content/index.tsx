@@ -15,9 +15,13 @@ import { chromePlatform } from '../platform'
 // extension-absolute URLs. Font faces added to document.fonts are visible
 // inside the shadow root, which is what makes this work at all.
 //
-// Registration is idempotent and deliberately not awaited: font-display:swap
-// equivalent behaviour is automatic here, so the toast paints immediately in
-// the ui-rounded fallback and upgrades in place when the woff2 lands.
+// Registration is idempotent and deliberately not awaited. `display: 'swap'`
+// mirrors tokens.css. The swap risk that makes 'swap' a real trade-off on the
+// web app barely exists here: these files come off local disk over
+// chrome-extension://, not the network, so they are in hand within a frame or
+// two of mount. 'optional' would be the wrong choice for the same reason it is
+// on the web — on a host page that somehow delayed the read, it would abandon
+// the face for the toast's whole lifetime rather than correcting.
 const FONT_WEIGHTS = [
   ['400', 'SF-Pro-Rounded-Regular.woff2'],
   ['500', 'SF-Pro-Rounded-Medium.woff2'],
