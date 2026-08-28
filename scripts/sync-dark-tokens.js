@@ -2,11 +2,24 @@
 /**
  * sync-dark-tokens.js
  *
- * Keeps [data-theme="dark"] as the single source of truth for dark-mode tokens.
- * Reads the declarations from that block and writes them verbatim into the
- * @media (prefers-color-scheme: dark) block — no manual duplication needed.
+ * Two guarantees, both about tokens that exist in more than one place.
  *
- * Usage:  node scripts/sync-dark-tokens.js
+ * 1. WITHIN each file: [data-theme="dark"] is the single source of truth for
+ *    dark-mode tokens. Its declarations are written verbatim into the
+ *    @media (prefers-color-scheme: dark) block.
+ *
+ * 2. ACROSS files: toast-styles.css inlines a hand-maintained shadow of
+ *    tokens.css (it cannot @import — CRXJS drops chained ?inline imports), and
+ *    both settings entrypoints load it AFTER tokens.css, so anything that
+ *    drifts there silently wins for the whole page. The tokens in
+ *    SHARED_TOKENS are copied from tokens.css into toast-styles.css so that
+ *    can't happen quietly.
+ *
+ * Usage:  node scripts/sync-dark-tokens.js           fix in place
+ *         node scripts/sync-dark-tokens.js --check   report drift, exit 1, write nothing
+ *
+ * The --check mode is the point of (2): it turns "keep these in step" from a
+ * comment into something CI or a pre-commit hook can actually enforce.
  */
 
 import { readFileSync, writeFileSync } from 'fs'
@@ -19,6 +32,19 @@ const FILES = [
   'packages/ui/src/tokens.css',
   'packages/ui/src/toast-styles.css',
 ]
+
+// Cross-file sync: tokens.css is the source, toast-styles.css the shadow.
+const SHARED_SOURCE = 'packages/ui/src/tokens.css'
+const SHARED_SHADOW = 'packages/ui/src/toast-styles.css'
+
+// Only tokens that MUST be identical in both files. This is intentionally a
+// short allow-list rather than "everything shared": the two files legitimately
+// diverge in places, and a blanket sync would erase that. --font-sans is here
+// because a mismatch is invisible in review and silently gives the toast a
+// different typeface from the rest of the app.
+const SHARED_TOKENS = ['--font-sans']
+
+const CHECK_ONLY = process.argv.includes('--check')
 
 // Returns { start, end, body } where start = index of '{', end = index of '}'.
 function findBlock(css, pattern) {
@@ -102,6 +128,86 @@ function syncFile(rel) {
   }
 }
 
-console.log('Syncing dark tokens…')
-for (const file of FILES) syncFile(file)
+// ─── cross-file shared tokens ────────────────────────────────────────────────
+
+// Matches a single custom-property declaration, capturing indent / value
+// separately so a rewrite preserves the alignment already in the file.
+function tokenPattern(name) {
+  return new RegExp(`^([ \\t]*)(${name})\\s*:\\s*([^;\\n]*);`, 'gm')
+}
+
+// Every declaration of `name` in `css`. More than one is an error rather than
+// a "last wins" guess — duplicates in these files have caused real bugs.
+function findDeclarations(css, name) {
+  return [...css.matchAll(tokenPattern(name))].map(m => ({
+    indent: m[1], value: m[3].trim(), index: m.index, full: m[0],
+  }))
+}
+
+function readSharedToken(css, name, rel) {
+  const found = findDeclarations(css, name)
+  if (found.length === 0) throw new Error(`${rel}: ${name} not found`)
+  if (found.length > 1)   throw new Error(`${rel}: ${name} declared ${found.length}× — expected exactly one`)
+  return found[0]
+}
+
+function syncSharedTokens() {
+  const sourcePath = resolve(ROOT, SHARED_SOURCE)
+  const shadowPath = resolve(ROOT, SHARED_SHADOW)
+  const sourceCss  = readFileSync(sourcePath, 'utf8')
+  let   shadowCss  = readFileSync(shadowPath, 'utf8')
+
+  const drifted = []
+
+  for (const name of SHARED_TOKENS) {
+    const src = readSharedToken(sourceCss, name, SHARED_SOURCE)
+    const dst = readSharedToken(shadowCss, name, SHARED_SHADOW)
+
+    if (src.value === dst.value) {
+      console.log(`  (in step)   ${name}`)
+      continue
+    }
+
+    drifted.push({ name, expected: src.value, actual: dst.value })
+    if (CHECK_ONLY) continue
+
+    shadowCss =
+      shadowCss.slice(0, dst.index) +
+      `${dst.indent}${name}: ${src.value};` +
+      shadowCss.slice(dst.index + dst.full.length)
+  }
+
+  if (!drifted.length) return 0
+
+  for (const d of drifted) {
+    console.log(`\n  DRIFT  ${d.name}`)
+    console.log(`    ${SHARED_SOURCE}\n      ${d.expected}`)
+    console.log(`    ${SHARED_SHADOW}\n      ${d.actual}`)
+  }
+
+  if (CHECK_ONLY) {
+    console.log(`\n  ✗ ${drifted.length} token(s) out of step. Run without --check to fix.`)
+    return drifted.length
+  }
+
+  writeFileSync(shadowPath, shadowCss, 'utf8')
+  console.log(`\n  ✓ rewrote   ${SHARED_SHADOW} from ${SHARED_SOURCE}`)
+  return 0
+}
+
+// A malformed file is a failure like any other — report it the way the drift
+// report reads, not as an uncaught stack trace. This runs in CI.
+try {
+  if (!CHECK_ONLY) {
+    console.log('Syncing dark tokens…')
+    for (const file of FILES) syncFile(file)
+  }
+
+  console.log(CHECK_ONLY ? 'Checking shared tokens…' : 'Syncing shared tokens…')
+  if (syncSharedTokens() > 0) process.exit(1)
+} catch (err) {
+  console.error(`\n  ✗ ${err.message}`)
+  process.exit(1)
+}
+
 console.log('Done.')

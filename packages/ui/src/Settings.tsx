@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Toaster, toast as sonnerToast } from 'sonner'
 import {
   BottleColor, BottleType, DEFAULT_PREFS, type SipPlatform, type SipPrefs,
@@ -55,6 +55,49 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
   // explicit user pick (changeTheme), so load/getPrefs never animates.
   const themeAnimRef = useRef(false)
   const themeTransTimer = useRef<ReturnType<typeof setTimeout>>()
+  // Test fires a real toast through Sonner, so it has to move where the live
+  // toast moves. .sip-toast-host does that in CSS for the extension; Sonner
+  // owns its own positioning, so here it takes a prop. Same 659 as the `narrow`
+  // screen in tailwind.config.ts and the media query in toast-styles.css.
+  const [stacked, setStacked] = useState(false)
+
+  // Press feedback for touch. See .btn-press in tokens.css for why :active
+  // cannot carry this on its own. Delegated on the document so every
+  // .btn-press picks it up — Test, the bottle thumbs, the colour swatches and
+  // the Appearance segments — with no per-button wiring.
+  //
+  // pointercancel is the one that matters on a phone: it fires when the
+  // browser takes the gesture over for scrolling, which is exactly when the
+  // button must let go rather than stay stuck at 0.96.
+  useEffect(() => {
+    let pressed: Element | null = null
+    const down = (e: PointerEvent) => {
+      const el = (e.target as Element | null)?.closest?.('.btn-press')
+      if (!el) return
+      pressed = el
+      el.setAttribute('data-pressed', '')
+    }
+    const release = () => {
+      pressed?.removeAttribute('data-pressed')
+      pressed = null
+    }
+    document.addEventListener('pointerdown', down, true)
+    document.addEventListener('pointerup', release, true)
+    document.addEventListener('pointercancel', release, true)
+    return () => {
+      document.removeEventListener('pointerdown', down, true)
+      document.removeEventListener('pointerup', release, true)
+      document.removeEventListener('pointercancel', release, true)
+    }
+  }, [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 659px)')
+    const sync = () => setStacked(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
 
   useEffect(() => {
     let live = true
@@ -279,11 +322,19 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
     {/* Test fires a REAL toast here, top-right, through the same Sonner
         pipeline the extension uses. The preview in the pane below is
         decoration — it never animates and never moves. */}
+    {/* --width is Sonner's own toast width and defaults to 356px, which would
+        have squeezed the 450px toast and made Test disagree with the real
+        thing at every viewport. Setting it to the same min() the scope uses
+        makes the two identical. Below 600px Sonner switches to its own
+        full-bleed rule using mobileOffset, so that has to match the 16px
+        gutter the content script applies. */}
     <Toaster
-      position="top-right"
+      position={stacked ? 'top-center' : 'top-right'}
       offset="16px"
+      mobileOffset="16px"
       visibleToasts={3}
       toastOptions={{ unstyled: true }}
+      style={{ '--width': 'min(450px, calc(100vw - 32px))' } as CSSProperties}
     />
 
     {/* Fixed-height flex tree, not a flowing page. That is what pins the
@@ -341,7 +392,7 @@ export default function Settings({ platform, onClose, headerRight }: Props) {
             {/* Decorative reference, not a live toast: same component as the
                 real thing (so the two can never drift), but inert and
                 unanimated. aria-hidden because Test provides the real one. */}
-            <div className="sip-toast-preview w-full max-w-[450px] pointer-events-none select-none" aria-hidden>
+            <div className="w-full max-w-[450px] pointer-events-none select-none" aria-hidden>
               <SipToast platform={platform} prefs={prefs} onDismiss={() => {}} mode="preview" />
             </div>
 

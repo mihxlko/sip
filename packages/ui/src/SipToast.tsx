@@ -37,59 +37,65 @@ export default function SipToast({ platform, prefs, onDismiss, mode = 'live' }: 
   }
 
   return (
-    <div className={mode === 'preview' ? 'sip-toast' : `${out ? 'toast out' : 'toast'} sip-toast`}>
+    /* The scope caps the toast at its 450px design width and is the container
+       the desktop/mobile query keys off. Rendered here rather than at each
+       mount site so the content script, Sonner and the Settings preview all
+       get the same behaviour without setting anything up. */
+    <div className="sip-toast-scope">
+      <div className={mode === 'preview' ? 'sip-toast' : `${out ? 'toast out' : 'toast'} sip-toast`}>
 
-      {/* ── inner row: toast-left + close × ── */}
-      <div className="sip-toast-row">
+        {/* ── inner row: toast-left + close × ── */}
+        <div className="sip-toast-row">
 
-        {/* toast-left: bottle + main content */}
-        <div className="sip-toast-left">
+          {/* toast-left: bottle + main content */}
+          <div className="sip-toast-left">
 
-          {/* bottle */}
-          <BottleIcon platform={platform} type={prefs.bottleType} color={prefs.bottleColor} />
+            {/* bottle */}
+            <BottleIcon platform={platform} type={prefs.bottleType} color={prefs.bottleColor} />
 
-          {/* main content */}
-          <div className="sip-toast-content">
+            {/* main content */}
+            <div className="sip-toast-content">
 
-            {/* header */}
-            <div className="sip-toast-header">
+              {/* header */}
+              <div className="sip-toast-header">
 
-              {/* title row — max-w matches the message width so a long title
-                  can't push main-content wider than the 350px message */}
-              {/* v2 dropped the logo badge that used to sit beside the title.
-                  Removed here and not just in Settings' preview: Test fires this
-                  very component top-right while the preview sits alongside it,
-                  so any difference between the two is immediately visible. */}
-              <div className="sip-toast-title-row">
-                <span className="sip-toast-title">
-                  {prefs.titleText}
-                </span>
+                {/* title row — max-w matches the message width so a long title
+                    can't push main-content wider than the 350px message */}
+                {/* v2 dropped the logo badge that used to sit beside the title.
+                    Removed here and not just in Settings' preview: Test fires this
+                    very component top-right while the preview sits alongside it,
+                    so any difference between the two is immediately visible. */}
+                <div className="sip-toast-title-row">
+                  <span className="sip-toast-title">
+                    {prefs.titleText}
+                  </span>
+                </div>
+
+                {/* message — 350px fixed (outdated); drives the toast's overall width */}
+                <p className="sip-toast-message">
+                  {prefs.messageText}
+                </p>
               </div>
 
-              {/* message — 350px fixed (outdated); drives the toast's overall width */}
-              <p className="sip-toast-message">
-                {prefs.messageText}
-              </p>
+              {/* edit preferences */}
+              <button
+                onClick={openPrefs}
+                className="sip-toast-edit"
+              >
+                Edit preferences
+              </button>
             </div>
-
-            {/* edit preferences */}
-            <button
-              onClick={openPrefs}
-              className="sip-toast-edit"
-            >
-              Edit preferences
-            </button>
           </div>
-        </div>
 
-        {/* close × */}
-        <button
-          onClick={dismiss}
-          aria-label="Dismiss"
-          className="sip-toast-close"
-        >
-          <XIcon />
-        </button>
+          {/* close × */}
+          <button
+            onClick={dismiss}
+            aria-label="Dismiss"
+            className="sip-toast-close"
+          >
+            <XIcon />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -107,23 +113,15 @@ function XIcon() {
 }
 
 // ─── bottle icon ──────────────────────────────────────────────────────────────
-// mix-blend-mode:color overlays the user's selected color onto the photographic
-// SVG while preserving luminance — keeps the bottle realistic but tinted.
+// The tint comes from the asset itself — getBottleUrl resolves to a per-color
+// SVG — so this renders flat, with no animation or blend layer over it.
 
 function BottleIcon({ platform, type, color }: { platform: SipPlatform; type: BottleType; color: BottleColor }) {
-  const src = platform.getBottleUrl(type, color)
   return (
-    <div style={{ position: 'relative', width: 24, height: 60, flexShrink: 0, isolation: 'isolate' }}>
-      <img
-        src={src}
-        alt=""
-        className="sip-bottle-shimmer"
-        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-      />
-      <div
-        className="sip-bottle-shimmer-overlay"
-        style={{ WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` }}
-      />
-    </div>
+    <img
+      className="sip-bottle"
+      src={platform.getBottleUrl(type, color)}
+      alt=""
+    />
   )
 }

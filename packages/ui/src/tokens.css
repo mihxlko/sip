@@ -4,6 +4,70 @@
    constants and never need to change between themes.
    ─────────────────────────────────────────────────────────────────────── */
 
+/* ─── typeface ──────────────────────────────────────────────────────────────
+   SF Pro Rounded, self-hosted. It has to be self-hosted: Safari refuses every
+   locally-installed family for web content (a fingerprinting defence), so the
+   old named-only stack resolved to Times, fell through to sans-serif, and
+   shipped Helvetica to every Safari visitor. Naming the family in @font-face
+   makes it OUR font rather than a local lookup, which is the whole fix —
+   Safari has never had a problem serving webfonts.
+
+   Subset to the Google-Fonts "latin" range, 68 KB across three weights. Only
+   400/500/600 exist because only font-normal/-medium/-semibold are used; if a
+   font-bold ever lands, its face has to be generated here or the browser will
+   synthesise a fake bold from 600.
+
+   font-display:swap, and the preloads in apps/web layout.tsx are what make it
+   behave. Preload starts the fetch at head-parse (~49ms, measured) instead of
+   after globals.css is parsed and laid out (~372ms), which puts the font ahead
+   of first paint (~420ms) for anything under roughly 350-400ms of latency —
+   i.e. most visitors never see a swap at all. Past that they get a brief
+   fallback and then the real face.
+
+   `optional` was tried and reverted. It does guarantee no swap, but the way it
+   buys that is by abandoning the font for the whole page load when it misses a
+   short block window: measured in real Safari 26.5 and real Chrome 151, WITH
+   preload, both kept the fallback at 300ms latency and above. On Chrome that
+   fallback is system-ui, because Chrome ignores ui-rounded — so a first-time
+   visitor on a slow link would have seen San Francisco and none of this
+   typeface at all. Ending up in the right face is worth a brief swap.
+
+   Inlining the woff2 as base64 was also considered and rejected: base64 of an
+   already-brotli-compressed woff2 does not re-compress (measured 24,156 B raw
+   -> 24,371 B base64+gzip), so it moves the full weight onto the render-
+   blocking path for nothing, and inlining one weight leaves the equally-used
+   500 on the network — a mixed-typeface page is worse than a uniform fallback.
+
+   The `/fonts/…` path resolves for both consumers: Next serves apps/web/public
+   at the origin root, and the extension's chrome-extension:// pages resolve it
+   against their own root. The content-script toast cannot use this rule at all
+   — it injects into a third-party page inside a shadow root, where @font-face
+   is ignored and a root-relative URL would hit the host's origin — so it
+   registers these same files through chrome.runtime.getURL() instead. See
+   apps/extension/src/content/index.tsx.
+   ─────────────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: "SF Pro Rounded";
+  src: url("/fonts/SF-Pro-Rounded-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SF Pro Rounded";
+  src: url("/fonts/SF-Pro-Rounded-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SF Pro Rounded";
+  src: url("/fonts/SF-Pro-Rounded-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
 
   /* ── primitive: neutrals ─────────────────────────────────────────────── */
@@ -118,7 +182,12 @@
   --color-button: var(--surface-primary);
 
   /* ── typography ─────────────────────────────────────────────────────── */
-  --font-sans: "SF Pro Rounded", sans-serif;
+  /* "SF Pro Rounded" here resolves to the @font-face at the top of this file,
+     never to a local lookup. `ui-rounded` sits second as the failed-fetch net:
+     on Apple platforms it is the system rounded face, so a dropped woff2
+     degrades rounded-to-rounded instead of falling to Helvetica. The tail
+     after it is the honest non-rounded floor for everyone else. */
+  --font-sans: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   --text-sm: 13px;
   --text-md: 15px;
@@ -169,17 +238,6 @@
   --box-shadow-subtle:  0px 1px 4px 0px rgba(0, 0, 0, 0.03);
   --box-shadow-default: 0px 2px 10px 0px rgba(0, 0, 0, 0.05);
   --box-shadow-strong:  0px 4px 10px 0px rgba(0, 0, 0, 0.05);
-
-  /* ── primitive: shimmer ────────────────────────────────────────────── */
-  --shimmer-hue-min: 0deg;
-  --shimmer-hue-max: 25deg;
-  --shimmer-hue-duration: 6s;
-
-  --shimmer-overlay-opacity-min: 0.03;
-  --shimmer-overlay-opacity-max: 0.12;
-  --shimmer-overlay-duration: 4s;
-
-  --shimmer-ease: ease-in-out;
 }
 
 /* ── explicit light theme ─────────────────────────────────────────────────── */
@@ -358,14 +416,26 @@
     color            150ms ease;
   will-change: transform;
 }
-.btn-press:active {
+/* [data-pressed] alongside :active, not instead of it. :active is unreliable
+   for touch: Chrome withholds it until it knows the gesture is not a scroll,
+   and iOS Safari does not apply it at all without a touch listener on the
+   element — so on a phone the button had no press feedback whatsoever, while
+   looking on desktop like it did. Verified under touch emulation that
+   touch-action: manipulation, touch-action: none, and the empty-touchstart
+   listener trick all fail to bring :active back.
+
+   Settings drives the attribute from pointerdown/up/cancel, which fire
+   identically for mouse, touch and pen. :active stays as the no-JS path. */
+.btn-press:active,
+.btn-press[data-pressed] {
   transform: scale(0.96);
   transition-duration: 100ms;
   transition-timing-function: ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
   .btn-press,
-  .btn-press:active {
+  .btn-press:active,
+  .btn-press[data-pressed] {
     transition: none;
     transform: none;
   }

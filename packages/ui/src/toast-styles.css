@@ -8,6 +8,13 @@
    --surface-base stayed #FBFBFB here and overrode the new white page. Keep the
    shared semantic names in step, or narrow this block to only what the toast
    actually needs.
+
+   `npm run check-tokens` enforces that for the tokens listed in SHARED_TOKENS
+   in scripts/sync-dark-tokens.js — currently just --font-sans, where a
+   mismatch would silently give the toast a different typeface from the rest of
+   the app. `npm run sync-dark-tokens` rewrites them from tokens.css. Everything
+   else in this block is still on the honour system; add it to that list when it
+   bites.
    ─────────────────────────────────────────────────────────────────────────── */
 
 :root,
@@ -93,7 +100,14 @@
   --color-button: var(--surface-primary);
 
   /* ── typography ─────────────────────────────────────────────────────── */
-  --font-sans: "SF Pro Rounded", sans-serif;
+  /* Must stay byte-identical to tokens.css. Deliberately NO @font-face here:
+     this sheet is injected as text into a shadow root on a third-party page,
+     where @font-face is ignored and `/fonts/…` would resolve against the host
+     site's origin. The content script registers the same three files on the
+     host document instead — see apps/extension/src/content/index.tsx. On the
+     two surfaces that load this sheet normally (the web app, the extension's
+     settings page) tokens.css is imported first and already declares them. */
+  --font-sans: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   --text-sm: 13px;
   --text-md: 15px;
@@ -146,17 +160,6 @@
   --sip-ease-out:       cubic-bezier(0.06, 0.59, 0.35, 1);
   --sip-enter-duration: 400ms;
   --sip-exit-duration:  200ms;
-
-  /* ── primitive: shimmer ────────────────────────────────────────────── */
-  --shimmer-hue-min: 0deg;
-  --shimmer-hue-max: 25deg;
-  --shimmer-hue-duration: 6s;
-
-  --shimmer-overlay-opacity-min: 0.03;
-  --shimmer-overlay-opacity-max: 0.12;
-  --shimmer-overlay-duration: 4s;
-
-  --shimmer-ease: ease-in-out;
 }
 
 [data-theme="dark"],
@@ -235,63 +238,104 @@
   to   { opacity: 0; transform: translateY(-100%)  scale(.98); }
 }
 
-@keyframes sip-shimmer-hue {
-  0%, 100% { filter: hue-rotate(var(--shimmer-hue-min)); }
-  50%      { filter: hue-rotate(var(--shimmer-hue-max)); }
-}
-
-@keyframes sip-shimmer-overlay {
-  0%, 100% { opacity: var(--shimmer-overlay-opacity-min); }
-  50%      { opacity: var(--shimmer-overlay-opacity-max); }
-}
-
 .toast     { animation: sip-in  var(--sip-enter-duration) var(--sip-ease-in)  both; pointer-events: auto; }
 .toast.out { animation: sip-out var(--sip-exit-duration)  var(--sip-ease-out) both; }
 
 /* ── reduced motion ──────────────────────────────────────────────────────────
    Honour the OS setting across every toast surface. The Sonner-driven preview
    toast is already covered by Sonner's own prefers-reduced-motion query; this
-   handles the live toast's enter/exit and the bottle shimmer, which loops on
-   all three surfaces (live, preview, static).                                  */
+   handles the live toast's enter/exit. The bottle itself no longer animates.   */
 @media (prefers-reduced-motion: reduce) {
   .toast,
-  .toast.out,
-  .sip-bottle-shimmer,
-  .sip-bottle-shimmer-overlay {
+  .toast.out {
     animation: none;
   }
-}
-
-.sip-bottle-shimmer {
-  animation: sip-shimmer-hue var(--shimmer-hue-duration) var(--shimmer-ease) infinite;
-}
-
-.sip-bottle-shimmer-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, transparent 50%, rgba(255, 255, 255, 0.4) 100%);
-  mix-blend-mode: overlay;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  animation: sip-shimmer-overlay var(--shimmer-overlay-duration) var(--shimmer-ease) infinite;
 }
 
 /* ── toast container ─────────────────────────────────────────────────────────
    Maps: w-[450px] bg-surface-elevated border-0.5 border-border-default
          rounded-xl shadow p-pad-xl flex flex-col overflow-clip font-sans antialiased
    ─────────────────────────────────────────────────────────────────────────── */
-/* Settings' decorative preview renders this very component so the two can
-   never drift — but inside the preview pane it has to fit rather than force a
-   450px floor. Scoped to the wrapper so the live toast is untouched. */
-.sip-toast-preview .sip-toast { width: min(450px, 100%); }
+/* ── scope ────────────────────────────────────────────────────────────────
+   The single element that decides which variant renders. It caps at the 450px
+   design width and shrinks below that, and it is the query container, so the
+   switch keys off THIS box rather than the window — which is what lets the
+   Settings preview pane show the mobile variant on its own width.
+
+   The threshold derives itself: the scope falls under 450 exactly when the
+   viewport drops under 482 (450 + 16 + 16 gutters). There is no breakpoint
+   constant anywhere in this file.
+
+   This also replaces the old `.sip-toast-preview .sip-toast` override — the
+   preview no longer needs a special case, it just gets a narrower scope.    */
+/* ── live-toast host row ──────────────────────────────────────────────────
+   Owns WHERE the toast sits, which is a separate decision from which variant
+   renders: the variant switches on the scope at 450 (viewport 482), the
+   position switches with the Settings layout at 659 so the whole interface
+   changes together rather than the toast moving on its own.
+
+   659 is the `narrow` screen in tailwind.config.ts. It is duplicated here
+   because this stylesheet is plain CSS injected into a shadow root and cannot
+   read Tailwind's config — keep the two in step.
+
+   Below 482 the toast is full-bleed, so flex-end and center resolve to the
+   same box; the switch only has visible effect in the 483–659 band.        */
+.sip-toast-host {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 659px) {
+  .sip-toast-host { justify-content: center; }
+}
+
+/* Settings' Test button fires through Sonner, which positions its own toast,
+   and below 600px Sonner's own rules put it in the wrong place twice over:
+
+     1. the band is `left:16px; right:16px; width:100%`, which is
+        over-constrained — width wins with left, so it spans 16..vw+16 and
+        hangs 16px off the right edge;
+     2. the toast is pinned left:0 inside that band, so at 483–600, where the
+        toast is 450 and the band is wider, it sat hard left while the live
+        toast was centred.
+
+   Dropping `width` lets left/right define the band correctly (16..vw-16), and
+   a definite width plus auto inline margins then centres the toast in it. The
+   two agree at every width. Centring on the toast alone was NOT enough — it
+   just inherited the band's 16px error.
+
+   Scoped to the centred position; the right-aligned desktop case never enters
+   this query. Inert in the content script's shadow root — no Sonner there. */
+@media (max-width: 600px) {
+  [data-sonner-toaster][data-x-position='center'] { width: auto; }
+
+  [data-sonner-toaster][data-x-position='center'] [data-sonner-toast] {
+    width: var(--width);
+    margin-inline: auto;
+  }
+}
+
+.sip-toast-scope {
+  container-type: inline-size;
+
+  /* `width: 450px; max-width: 100%` and NOT `width: min(450px, 100%)`, which
+     looks equivalent and is not. Sonner's <li> is position:absolute with a
+     shrink-to-fit width, and a percentage inside a shrink-to-fit box resolves
+     to zero while the parent's intrinsic size is being computed — the scope
+     collapsed to 34px and the toast wrapped to 329px tall. A definite 450px
+     gives the li something to size to, and max-width clamps afterwards
+     against the real containing block, so both contexts get min(450, avail).
+
+     It only reproduced above 600px: below that Sonner's own mobile rule gives
+     the li an explicit width and the percentage had something to resolve
+     against. */
+  width: 450px;
+  max-width: 100%;
+}
 
 .sip-toast {
-  width: 450px;
+  width: 100%;
+  position: relative;   /* containing block for the mobile corner × */
   background-color: var(--surface-elevated);
   border-width: var(--border-width-default);
   border-color: var(--border-emphasis);
@@ -372,13 +416,21 @@
 /* custom icon img inside badge
    Maps: block rounded-md object-cover                                        */
 /* message paragraph
-   Maps: m-0 w-[350px] text-text-muted text-sm font-medium leading-[16px]   */
+   Maps: m-0 text-text-tertiary text-sm font-medium leading-[16px]
+
+   text-tertiary, not text-muted: muted is neutral-300 in light and neutral-500
+   in dark, so the message read washed out on light and dim on dark. Tertiary
+   is neutral-400 in BOTH themes, which darkens it on light and lifts it on
+   dark — one value, more contrast in each. The close × takes the same token:
+   at text-muted it was 2.29:1 against the light surface, under the 3:1 that
+   WCAG 1.4.11 asks of a UI component's graphics.                             */
 .sip-toast-message {
+  --sip-message-line: 16px;
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
-  line-height: 16px;
+  line-height: var(--sip-message-line);
 }
 
 /* edit preferences button
@@ -402,7 +454,14 @@
 
 /* close × button
    Maps: cursor-pointer bg-transparent border-0 outline-none
-         appearance-none shrink-0 leading-none p-xs text-text-muted          */
+         appearance-none shrink-0 p-xs text-text-tertiary
+
+   The box is exactly as tall as the title's line box and the glyph centres
+   inside it, so the × sits on the title's optical centre. `padding: 4px` used
+   to give an 18px-tall box against a 21.25px title line, putting the glyph
+   1.6px high — visible once you look for it. Width is unchanged (4+10+4=18):
+   only the block axis moved, and the row is align-items:flex-start, so
+   nothing else shifts.                                                       */
 .sip-toast-close {
   cursor: pointer;
   background-color: transparent;
@@ -410,8 +469,132 @@
   outline: none;
   appearance: none;
   flex-shrink: 0;
-  line-height: 1;
-  padding: var(--space-gap-xs);
-  color: var(--text-muted);
+  height: calc(var(--text-lg) * var(--leading-tight));
+  padding: 0 var(--space-gap-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
   font-family: inherit;
+}
+
+.sip-toast-close svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+
+/* bottle
+   Maps: the inline width/height BottleIcon used to carry. Lifted to a class
+   so the mobile variant can resize it.                                       */
+.sip-bottle {
+  width: 24px;
+  height: 60px;
+  flex-shrink: 0;
+  object-fit: contain;
+  display: block;
+}
+
+/* ── MOBILE VARIANT ──────────────────────────────────────────────────────────
+   Fires only when the 450px design width cannot fit. Nothing here is a scale
+   factor — type stays at its real size and the box simply fills the width.
+   The differences are structural, because the desktop layout spends pixels a
+   phone does not have:
+
+     desktop chrome  40 pad + 1 border + 30 row gap + 18 × + 24 bottle + 20 gap = 133
+     mobile  chrome  32 pad + 1 border +  0         +  0  + 20 bottle + 16 gap =  69
+
+   The 48px comes from taking the × out of the flex row, not from deleting it.
+   At the 360px floor that leaves a 259px text column — versus the 210px a
+   scaled-down desktop toast would have given the same phone.
+
+   Because this block cannot match above 450px, the desktop variant above is
+   unreachable from here: it is the same component, but desktop cannot regress.
+   ─────────────────────────────────────────────────────────────────────────── */
+@container (width < 450px) {
+
+  /* 16px on every side — padding, bottle gap, content gap alike. */
+  .sip-toast {
+    padding: var(--space-padding-lg);
+
+    /* × geometry lives on the toast, not the button, because the title rule
+       below has to derive its clearance from the same numbers. */
+    --sip-tap:     44px;
+    --sip-glyph:   10px;
+    --sip-inset-x: 17px;
+    --sip-inset-y: calc(var(--space-padding-lg) + (var(--text-lg) * var(--leading-tight)) / 2);
+
+    /* How far the glyph intrudes into the text column, measured from the
+       content edge: (inset-x + glyph) - padding = 11px. Any row that sits at
+       the glyph's y must stop at least this far in. */
+    --sip-glyph-reach: calc(var(--sip-inset-x) + var(--sip-glyph) - var(--space-padding-lg));
+  }
+  .sip-toast-row     { gap: 0; }
+  .sip-toast-left    { gap: var(--space-padding-lg); }
+  .sip-toast-content { gap: var(--space-padding-lg); }
+
+  /* 24×60 shrunk on its own 0.4 ratio. */
+  .sip-bottle { width: 20px; height: 50px; }
+
+  /* Corner ×, positioned from the GLYPH outward rather than from the box in.
+     --sip-inset-y is the title's optical centre, so the glyph lands where the
+     desktop one does relative to its own title; the 44px HIG tap target then
+     grows symmetrically around that point and can hang past the padding
+     without dragging the glyph up with it.
+
+     --sip-inset-x is 17 rather than 16 so the glyph's right edge lands on the
+     content column's right edge once the 0.5px border is counted, and `right`
+     resolves to 0 instead of -1 (which `overflow: clip` would have shaved).  */
+  .sip-toast-close {
+    position: absolute;
+    top:    0;
+    right:  calc(var(--sip-inset-x) + var(--sip-glyph) / 2 - var(--sip-tap) / 2);
+    width:  var(--sip-tap);
+    height: var(--sip-tap);
+
+    /* The glyph is placed by padding rather than by centring it in the box, so
+       the 44px target grows UP and RIGHT into the toast's dead corner instead
+       of down and left into the text column. Centred, it reached 22px below
+       the glyph and clipped the message's first line wherever that line
+       happened to wrap long — measured as a real hit at 375px. Anchoring at
+       top:0 cuts that reach to a ~12x5px corner while keeping the full 44px. */
+    align-items: flex-start;
+    padding: calc(var(--sip-inset-y) - var(--sip-glyph) / 2) 0 0 0;
+  }
+
+  /* Right rail. The × is out of flow but it is NOT outside the text column:
+     the glyph sits in that column's rightmost ~11px. The title overlaps it
+     outright (both span y 83–93), and the message's first line clears it by
+     only 7px vertically while running 1.8px PAST its left edge horizontally —
+     which reads as the text colliding with the ×, and puts the last ~18px of
+     that line inside the 44px tap target.
+
+     8px on the row keeps the message and Edit clear — they sit BELOW the
+     glyph (7px of vertical clearance), so they only need to not look crowded.
+
+     The title is different: it is the one row at the glyph's own y, so it has
+     to clear the glyph itself, not merely look uncrowded. It takes the row's
+     8px plus enough to cover --sip-glyph-reach with ~5px of air. Derived, so
+     moving the × or the padding cannot silently reintroduce the collision. */
+  .sip-toast-row { padding-right: var(--space-padding-md); }
+
+  .sip-toast-title-row {
+    padding-right: calc(var(--sip-glyph-reach) + var(--space-gap-xs) - var(--space-padding-md));
+  }
+
+  /* Two lines is a CEILING, not a reservation. An earlier version also set
+     min-height: 2 lines so the toast height was constant at every width and
+     message length — but the reserved box is top-aligned, so a one-line
+     message left a 16px phantom gap above Edit and the spacing read as wrong.
+     Height now follows content and the message→Edit gap is always 16px.
+
+     The trade, deliberately taken: a message that wraps at one width and not
+     another changes the toast's height between them. On a phone the viewport
+     does not change, so this only shows while resizing. */
+  .sip-toast-message {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
 }
