@@ -402,11 +402,17 @@
 /* custom icon img inside badge
    Maps: block rounded-md object-cover                                        */
 /* message paragraph
-   Maps: m-0 w-[350px] text-text-muted text-sm font-medium leading-[16px]   */
+   Maps: m-0 text-text-tertiary text-sm font-medium leading-[16px]
+
+   text-tertiary, not text-muted: muted is neutral-300 in light and neutral-500
+   in dark, so the message read washed out on light and dim on dark. Tertiary
+   is neutral-400 in BOTH themes, which darkens it on light and lifts it on
+   dark — one value, more contrast in each. The close × stays muted; it is
+   chrome, not content.                                                       */
 .sip-toast-message {
   --sip-message-line: 16px;
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   line-height: var(--sip-message-line);
