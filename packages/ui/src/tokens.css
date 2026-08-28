@@ -416,14 +416,26 @@
     color            150ms ease;
   will-change: transform;
 }
-.btn-press:active {
+/* [data-pressed] alongside :active, not instead of it. :active is unreliable
+   for touch: Chrome withholds it until it knows the gesture is not a scroll,
+   and iOS Safari does not apply it at all without a touch listener on the
+   element — so on a phone the button had no press feedback whatsoever, while
+   looking on desktop like it did. Verified under touch emulation that
+   touch-action: manipulation, touch-action: none, and the empty-touchstart
+   listener trick all fail to bring :active back.
+
+   Settings drives the attribute from pointerdown/up/cancel, which fire
+   identically for mouse, touch and pen. :active stays as the no-JS path. */
+.btn-press:active,
+.btn-press[data-pressed] {
   transform: scale(0.96);
   transition-duration: 100ms;
   transition-timing-function: ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
   .btn-press,
-  .btn-press:active {
+  .btn-press:active,
+  .btn-press[data-pressed] {
     transition: none;
     transform: none;
   }

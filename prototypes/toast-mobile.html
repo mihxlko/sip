@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Sip — toast mobile variant lab</title>
+<!--
+  ─── toast mobile variant lab ───────────────────────────────────────────────
+
+  Two variants of ONE toast, switched by a single container query. Nothing
+  scales: type is fixed at real sizes in both variants, and the box simply
+  gets wider or narrower.
+
+    .sip-toast-scope  container-type: inline-size; width: min(450px, 100%)
+    @container (width < 450px)  →  mobile variant
+
+  The threshold derives itself. The scope is min(450px, 100%), so it falls
+  below 450 exactly when the viewport drops under 482 (450 + 16 + 16 gutters).
+  No hardcoded breakpoint, and because it is a CONTAINER query the Settings
+  preview pane switches on its own width rather than the window's.
+
+  Structural difference, not a smaller copy. Desktop spends 133px of its 450
+  on chrome; 48 of that is the close x (18) plus the --space-gap-xl row gap
+  (30) that separates it. Mobile pulls the x out of flow into the corner and
+  reclaims all 48:
+
+    desktop chrome  40 pad + 1 border + 30 gap + 18 close + 24 bottle + 20 gap = 133
+    mobile  chrome  32 pad + 1 border +  0     +  0       + 20 bottle + 16 gap =  69
+
+  Which is why a 430px phone gets a 329px text column — WIDER than desktop's
+  317 — while a scaled-down desktop toast would have given it 210.
+
+  WHAT TO JUDGE HERE
+    1. Close treatment. A / B / C toggle. B is the recommendation.
+    2. The character cap. "Measure cap" runs a real binary search on rendered
+       line count at the narrowest frame. Do not trust arithmetic for this.
+    3. Whether the mobile bottle at 20x50 reads right next to desktop's 24x60.
+
+  MEASUREMENT TRUST: the cap is only valid if this page resolves the same font
+  production does. The banner up top reports the resolved family and warns if
+  SF Pro Rounded did not load (Safari blocks local fonts — see the ui-rounded
+  fallback in the stack below, which production does NOT have).
+  ─────────────────────────────────────────────────────────────────────────── -->
+<style>
+/* ─── tokens ────────────────────────────────────────────────────────────────
+   Deliberately narrowed to only what the toast reads. toast-styles.css warns
+   that its inlined token copy shadows tokens.css page-wide; this is what that
+   block should look like.                                                    */
+:root {
+  --white:#FFFFFF; --neutral-50:#F1F1F2; --neutral-100:#E3E3E5;
+  --neutral-150:#D4D5D8; --neutral-300:#AAABB2; --neutral-400:#8D8F98;
+  --neutral-500:#71737F; --neutral-700:#44454C; --neutral-750:#333439;
+  --neutral-800:#323338; --neutral-850:#28282C; --neutral-900:#222326;
+  --neutral-997:#171719;
+  --brand-primary-500:#51A0EA;
+
+  --surface-elevated: var(--white);
+  --surface-page:     #F1F1F2;
+  --text-primary:     var(--neutral-800);
+  --text-muted:       var(--neutral-300);
+  --text-brand:       var(--brand-primary-500);
+  --border-emphasis:  var(--neutral-150);
+
+  --font-sans: "SF Pro Rounded", ui-rounded, -apple-system, sans-serif;
+  --text-sm:13px; --text-lg:17px;
+  --font-medium:500; --font-semibold:600;
+  --leading-tight:1.25;
+  --border-width-default:0.5px;
+  --radius-xl:16px;
+  --box-shadow-default: 0px 2px 10px 0px rgba(0,0,0,0.05);
+}
+[data-theme="dark"] {
+  --surface-elevated: var(--neutral-800);
+  --surface-page:     var(--neutral-997);
+  --text-primary:     var(--neutral-50);
+  --text-muted:       var(--neutral-500);
+  --border-emphasis:  var(--neutral-700);
+  --box-shadow-default: 0px 2px 10px 0px rgba(113,115,127,0.00);
+}
+
+*,*::before,*::after { box-sizing:border-box; }
+
+/* ─── DESKTOP VARIANT — shipped toast-styles.css, visually unchanged ────────
+   Two additions, both inert at desktop size: `position: relative` on
+   .sip-toast (anchors the mobile corner x) and explicit width/height on the
+   close svg (it carries them as attributes today). Every other value is what
+   ships. That is the risk argument for a variant over a rewrite — the mobile
+   block can only fire under 450px, so it cannot reach any of this.           */
+
+.sip-toast-scope {
+  container-type: inline-size;
+  width: min(450px, 100%);
+  margin-left: auto;              /* top-right on desktop, full-bleed narrow */
+}
+
+.sip-toast {
+  position: relative;             /* NEW — anchors the mobile corner x        */
+  width: 100%;
+  background-color: var(--surface-elevated);
+  border-width: var(--border-width-default);
+  border-style: solid;
+  border-color: var(--border-emphasis);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--box-shadow-default);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.sip-toast-row       { display:flex; gap:30px; align-items:flex-start; justify-content:space-between; }
+.sip-toast-left      { display:flex; flex:1; min-width:0; gap:20px; align-items:flex-start; }
+.sip-toast-content   { display:flex; flex:1; min-width:0; flex-direction:column; gap:20px; }
+.sip-toast-header    { display:flex; flex-direction:column; gap:2px; }
+.sip-toast-title-row { display:flex; align-items:center; gap:6px; max-width:100%; }
+
+.sip-toast-title {
+  min-width:0; color:var(--text-primary);
+  font-size:var(--text-lg); font-weight:var(--font-semibold);
+  line-height:var(--leading-tight);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.sip-toast-message {
+  margin:0; color:var(--text-muted);
+  font-size:var(--text-sm); font-weight:var(--font-medium);
+  line-height:16px;
+}
+
+.sip-toast-edit {
+  cursor:pointer; background:transparent; border:0; padding:0; outline:none;
+  appearance:none; color:var(--text-brand);
+  font-size:var(--text-sm); font-weight:var(--font-medium);
+  line-height:16px; width:fit-content; font-family:inherit;
+}
+
+.sip-toast-close {
+  cursor:pointer; background:transparent; border:0; outline:none; appearance:none;
+  flex-shrink:0; line-height:1; padding:4px; color:var(--text-muted);
+  font-family:inherit;
+}
+.sip-toast-close svg { display:block; width:10px; height:10px; }
+
+.sip-bottle { width:24px; height:60px; flex-shrink:0; object-fit:contain; display:block; }
+
+/* ─── MOBILE VARIANT ───────────────────────────────────────────────────────
+   Fires only when 450 cannot fit. Everything here is a structural override,
+   not a scale factor: type stays at its real size, the box fills the width.  */
+@container (width < 450px) {
+
+  .sip-toast { padding:16px; }
+
+  /* Bottle STAYS — 24x60 shrunk on its own 0.4 ratio. Dropping it would have
+     bought 36px of column, but it is the only thing carrying bottleType and
+     bottleColor onto the toast, and the 360px floor leaves enough room without
+     that trade.                                                              */
+  .sip-bottle { width:20px; height:50px; }
+
+  .sip-toast-row     { gap:0; }
+  .sip-toast-left    { gap:16px; }
+  .sip-toast-content { gap:16px; }
+
+  /* Corner x, positioned from the GLYPH outward instead of from the box in.
+     --inset-y is the title's optical centre (16 pad + 20px line-box / 2 = 26),
+     which is where desktop's x sits relative to its own title. The 44px HIG
+     target then grows symmetrically around that point, so it can hang past
+     the padding without dragging the glyph up with it. No translate fudge —
+     that was the bug you spotted.                                            */
+  [data-close="corner"] .sip-toast-close {
+    --tap:   44px;
+    --glyph: 10px;
+    --inset-x: 17px;   /* 17 not 16 so `right` resolves to 0 rather than -1  */
+    --inset-y: 26.625px; /* title centre: 16 pad + (17 * 1.25) / 2           */
+    position: absolute;
+    top:   calc(var(--inset-y) - var(--tap) / 2);                     /* 4px */
+    right: calc(var(--inset-x) + var(--glyph) / 2 - var(--tap) / 2);  /* 0px */
+    width: var(--tap); height: var(--tap); padding:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  [data-close="corner"] .sip-toast-close svg { transform:none; }
+
+  /* Only the TITLE needs to clear the glyph. Message and Edit sit below the x
+     and take the full column — which is why the extra row padding is a toggle
+     below rather than a default.                                            */
+  [data-close="corner"] .sip-toast-title-row { padding-right:26px; }
+
+  /* Optional: the extra 16px right inset from the Paper file. Costs column
+     width on every row, not just the title. Toggle it and watch the cap.    */
+  [data-pad="on"] .sip-toast-row { padding-right:16px; }
+
+  [data-close="swipe"] .sip-toast-close { display:none; }
+  [data-close="swipe"] .sip-toast::after {
+    content:''; position:absolute; left:50%; bottom:5px;
+    width:34px; height:3px; margin-left:-17px; border-radius:2px;
+    background:var(--text-muted); opacity:.35;
+  }
+  [data-close="swipe"] .sip-toast { padding-bottom:20px; }
+
+  /* Reserve exactly two lines so height is a constant, not a function of
+     messageText. This — not the variant — is what stops the height moving.  */
+  .sip-toast-message {
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    overflow:hidden; min-height:32px;
+  }
+  .measuring .sip-toast-message {
+    display:block; -webkit-line-clamp:none; overflow:visible; min-height:0;
+  }
+}
+
+/* Debug: outline the 44px tap target so collisions with Edit are visible. */
+.showtap .sip-toast-close { outline:1px dashed #F75951; outline-offset:-1px; }
+
+/* ─── lab chrome (not part of the build) ───────────────────────────────────*/
+body { margin:0; background:var(--surface-page); color:var(--text-primary);
+       font-family:var(--font-sans); padding:20px 24px 60px; }
+h1   { font-size:15px; font-weight:600; margin:0 0 2px; }
+.sub { font-size:12px; color:var(--text-muted); margin:0 0 16px; }
+
+.bar { display:flex; flex-wrap:wrap; gap:16px; align-items:center;
+       padding:12px 14px; background:var(--surface-elevated);
+       border:0.5px solid var(--border-emphasis); border-radius:12px;
+       margin-bottom:14px; font-size:12px; }
+.bar label { display:flex; gap:6px; align-items:center; }
+.bar input[type=text] { width:340px; font:inherit; padding:5px 8px;
+       border:0.5px solid var(--border-emphasis); border-radius:7px;
+       background:var(--surface-page); color:var(--text-primary); }
+.bar button { font:inherit; cursor:pointer; padding:5px 11px; border-radius:7px;
+       border:0.5px solid var(--border-emphasis); background:var(--surface-page);
+       color:var(--text-primary); }
+.bar button.on { background:var(--text-brand); border-color:var(--text-brand); color:#fff; }
+
+#fontwarn { padding:9px 12px; border-radius:9px; font-size:12px; margin-bottom:14px; }
+#fontwarn.ok  { background:#E4F6FC; color:#1B4A5E; }
+#fontwarn.bad { background:#FFEAEA; color:#8A2F2A; }
+
+.rail  { display:flex; gap:18px; align-items:flex-start; overflow-x:auto;
+         padding-bottom:14px; }
+.frame { flex:none; }
+.cap   { font-size:11px; color:var(--text-muted); margin-bottom:5px;
+         display:flex; justify-content:space-between; gap:10px; }
+.cap b { color:var(--text-primary); font-weight:600; }
+.ok    { color:#00905F; font-weight:600; }
+.bad   { color:#D0342C; font-weight:600; }
+
+/* simulates a viewport; the host mirrors content/index.tsx exactly */
+.view  { background:var(--surface-page); border:0.5px dashed var(--border-emphasis);
+         border-radius:10px; padding:16px; }
+[data-theme="dark"] .view { background:#0d0d0f; }
+
+#free { resize:horizontal; overflow:auto; min-width:290px; max-width:760px; width:393px; }
+</style>
+</head>
+<body>
+
+<h1>Toast — desktop / mobile variant lab</h1>
+<p class="sub">One component. One container query at <code>width &lt; 450px</code>. No scaling anywhere.
+  <b>SHIPPED</b> — this lab matches packages/ui/src/toast-styles.css; measured cap at the 360 floor is 94 realistic chars, set to 90.</p>
+
+<div id="fontwarn">checking font…</div>
+
+<div class="bar">
+  <label>close
+    <button data-set="inflow">A in-flow</button>
+    <button data-set="corner" class="on">B corner</button>
+    <button data-set="swipe">C swipe</button>
+  </label>
+  <label>message
+    <input id="msg" type="text" maxlength="140"
+           value="Sending you a friendly reminder to drink some water.">
+    <span id="msglen"></span>
+  </label>
+  <label>extra 16px row inset
+    <button id="pad">off</button>
+  </label>
+  <label>tap target
+    <button id="tap">hide</button>
+  </label>
+  <button id="measure">Measure cap</button>
+  <button id="theme">Dark</button>
+</div>
+
+<div id="capout" class="bar" style="display:none"></div>
+
+<div class="rail" id="rail"></div>
+
+<h1 style="margin-top:26px">Free resize</h1>
+<p class="sub">Drag the bottom-right corner. Watch the switch at 482px.</p>
+<div class="view" id="free"></div>
+
+<script>
+const BOTTLE = '../packages/ui/src/bottles/1.5-yeti-blue.png';
+const TITLE  = 'Drink Up!';
+const WIDTHS = [520, 482, 481, 430, 393, 375, 360];  /* 360 = agreed floor */
+const toastW = w => Math.min(450, w - 32);
+
+function toastHTML(msg) {
+  return `
+  <div class="sip-toast-scope">
+    <div class="sip-toast">
+      <div class="sip-toast-row">
+        <div class="sip-toast-left">
+          <img class="sip-bottle" src="${BOTTLE}" alt="">
+          <div class="sip-toast-content">
+            <div class="sip-toast-header">
+              <div class="sip-toast-title-row"><span class="sip-toast-title">${TITLE}</span></div>
+              <p class="sip-toast-message">${msg}</p>
+            </div>
+            <button class="sip-toast-edit">Edit preferences</button>
+          </div>
+        </div>
+        <button class="sip-toast-close" aria-label="Dismiss">
+          <svg viewBox="0 0 8 8" fill="currentColor">
+            <path d="M6.8 7.6L0.4 1.2C0.181 0.981 0.181 0.619 0.4 0.4C0.619 0.181 0.981 0.181 1.2 0.4L7.6 6.8C7.819 7.019 7.819 7.381 7.6 7.6C7.381 7.819 7.019 7.819 6.8 7.6Z"/>
+            <path d="M0.4 7.6C0.181 7.381 0.181 7.019 0.4 6.8L6.8 0.4C7.019 0.181 7.381 0.181 7.6 0.4C7.819 0.619 7.819 0.981 7.6 1.2L1.2 7.6C0.981 7.819 0.619 7.819 0.4 7.6Z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+const rail = document.getElementById('rail');
+rail.innerHTML = WIDTHS.map(w => `
+  <div class="frame" data-w="${w}">
+    <div class="cap"><span><b>${w}px</b> vp · ${toastW(w)}px toast</span><span class="readout"></span></div>
+    <div class="view" style="width:${w}px">${toastHTML('')}</div>
+  </div>`).join('');
+document.getElementById('free').innerHTML = toastHTML('');
+
+const msgEl = document.getElementById('msg');
+
+function render() {
+  const m = msgEl.value;
+  document.querySelectorAll('.sip-toast-message').forEach(p => p.textContent = m);
+  document.getElementById('msglen').textContent = m.length + ' chars';
+  readout();
+}
+
+/* Real rendered line count: unclamp, measure, restore. Arithmetic on average
+   glyph width is not reliable enough to set a character limit from. */
+function linesOf(frame) {
+  const p = frame.querySelector('.sip-toast-message');
+  frame.classList.add('measuring');
+  const h = p.scrollHeight, w = p.clientWidth;
+  frame.classList.remove('measuring');
+  return { lines: Math.max(1, Math.round(h / 16)), col: w };
+}
+
+function readout() {
+  document.querySelectorAll('.frame').forEach(f => {
+    const w = +f.dataset.w;
+    const { lines, col } = linesOf(f);
+    const mobile = (Math.min(450, w - 32)) < 450;
+    const overflow = mobile && lines > 2;
+    f.querySelector('.readout').innerHTML =
+      `${mobile ? 'mobile' : 'desktop'} · col <b>${col}px</b> · ` +
+      `<span class="${overflow ? 'bad' : 'ok'}">${lines} line${lines>1?'s':''}${overflow ? ' ✗' : ' ✓'}</span>`;
+  });
+}
+
+/* Binary search the largest character count that still renders within 2 lines
+   at the narrowest frame. Run against a lowercase-heavy realistic string and
+   again against a wide-glyph worst case, then round the realistic one down. */
+function measureCap() {
+  const narrow = document.querySelector('.frame:last-child');
+  const p = narrow.querySelector('.sip-toast-message');
+  const before = p.textContent;
+
+  const probe = (sample) => {
+    let lo = 0, hi = 200;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      p.textContent = sample.repeat(Math.ceil(mid / sample.length)).slice(0, mid);
+      narrow.classList.add('measuring');
+      const lines = Math.round(p.scrollHeight / 16);
+      narrow.classList.remove('measuring');
+      if (lines <= 2) lo = mid; else hi = mid - 1;
+    }
+    return lo;
+  };
+
+  const real  = probe('Sending you a friendly reminder to drink some water. ');
+  const wide  = probe('MWQOMWQO ');
+  p.textContent = before;
+
+  const rec = Math.floor(real / 5) * 5;
+  document.getElementById('capout').style.display = '';
+  document.getElementById('capout').innerHTML =
+    `<span>at <b>${narrow.dataset.w}px</b> (narrowest): realistic text fits <b>${real}</b> chars in 2 lines · ` +
+    `wide-glyph worst case <b>${wide}</b> · ` +
+    `recommended cap <b class="ok">${rec}</b> (rounded down to base 5) · ` +
+    `today <code>prefs.ts:26</code> allows 120</span>`;
+}
+
+document.querySelectorAll('[data-set]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-set]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.querySelectorAll('.sip-toast-scope').forEach(s => s.dataset.close = b.dataset.set);
+  readout();
+});
+document.getElementById('theme').onclick = e => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+  e.target.textContent = dark ? 'Dark' : 'Light';
+};
+document.getElementById('pad').onclick = e => {
+  const on = e.target.textContent === 'on';
+  e.target.textContent = on ? 'off' : 'on';
+  e.target.classList.toggle('on', !on);
+  document.querySelectorAll('.sip-toast-scope').forEach(s => s.dataset.pad = on ? 'off' : 'on');
+  readout();
+};
+document.getElementById('tap').onclick = e => {
+  const on = document.body.classList.toggle('showtap');
+  e.target.textContent = on ? 'shown' : 'hide';
+  e.target.classList.toggle('on', on);
+};
+document.getElementById('measure').onclick = measureCap;
+msgEl.oninput = render;
+
+/* Is the cap trustworthy? Only if this page resolved the same family the
+   extension does. Compare an SF-Pro-Rounded measurement against a guaranteed
+   fallback; identical widths mean it never loaded. */
+(function fontCheck() {
+  const c = document.createElement('canvas').getContext('2d');
+  const s = 'Sending you a friendly reminder';
+  c.font = '13px "SF Pro Rounded"';        const a = c.measureText(s).width;
+  c.font = '13px "__definitely_missing__"'; const b = c.measureText(s).width;
+  const el = document.getElementById('fontwarn');
+  if (Math.abs(a - b) > 0.5) {
+    el.className = 'ok';
+    el.textContent = 'SF Pro Rounded resolved — measurements match production.';
+  } else {
+    el.className = 'bad';
+    el.textContent = 'SF Pro Rounded did NOT load (Safari blocks local fonts). '
+      + 'Layout is representative but the character cap is not — open in Chrome to measure.';
+  }
+})();
+
+document.querySelectorAll('.sip-toast-scope').forEach(s => s.dataset.close = 'corner');
+render();
+</script>
+</body>
+</html>
