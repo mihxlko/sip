@@ -17,18 +17,26 @@
    font-bold ever lands, its face has to be generated here or the browser will
    synthesise a fake bold from 600.
 
-   font-display:optional, not swap, and that is a deliberate trade. `swap`
-   repaints the page in a different face the instant the woff2 lands — measured
-   in both engines, it fires on EVERY load where the font is not already
-   cached, however small the metric delta. `optional` gives the browser a ~100ms
-   block window: if the font makes it, it is used with no swap; if it does not,
-   the fallback is kept for that page load and the font is cached for the next
-   one. Either way the reader never sees type change under them.
-   The cost is that a first visit on a slow connection renders in ui-rounded —
-   acceptable here precisely because that fallback is itself a rounded face on
-   Apple platforms, so the failure mode is "slightly different rounded font",
-   not "wrong typeface". Paired with the preloads in apps/web layout.tsx, which
-   start the fetch ~320ms earlier and make the block window winnable.
+   font-display:swap, and the preloads in apps/web layout.tsx are what make it
+   behave. Preload starts the fetch at head-parse (~49ms, measured) instead of
+   after globals.css is parsed and laid out (~372ms), which puts the font ahead
+   of first paint (~420ms) for anything under roughly 350-400ms of latency —
+   i.e. most visitors never see a swap at all. Past that they get a brief
+   fallback and then the real face.
+
+   `optional` was tried and reverted. It does guarantee no swap, but the way it
+   buys that is by abandoning the font for the whole page load when it misses a
+   short block window: measured in real Safari 26.5 and real Chrome 151, WITH
+   preload, both kept the fallback at 300ms latency and above. On Chrome that
+   fallback is system-ui, because Chrome ignores ui-rounded — so a first-time
+   visitor on a slow link would have seen San Francisco and none of this
+   typeface at all. Ending up in the right face is worth a brief swap.
+
+   Inlining the woff2 as base64 was also considered and rejected: base64 of an
+   already-brotli-compressed woff2 does not re-compress (measured 24,156 B raw
+   -> 24,371 B base64+gzip), so it moves the full weight onto the render-
+   blocking path for nothing, and inlining one weight leaves the equally-used
+   500 on the network — a mixed-typeface page is worse than a uniform fallback.
 
    The `/fonts/…` path resolves for both consumers: Next serves apps/web/public
    at the origin root, and the extension's chrome-extension:// pages resolve it
@@ -43,21 +51,21 @@
   src: url("/fonts/SF-Pro-Rounded-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
 }
 @font-face {
   font-family: "SF Pro Rounded";
   src: url("/fonts/SF-Pro-Rounded-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
 }
 @font-face {
   font-family: "SF Pro Rounded";
   src: url("/fonts/SF-Pro-Rounded-Semibold.woff2") format("woff2");
   font-weight: 600;
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
 }
 
 :root {
@@ -230,17 +238,6 @@
   --box-shadow-subtle:  0px 1px 4px 0px rgba(0, 0, 0, 0.03);
   --box-shadow-default: 0px 2px 10px 0px rgba(0, 0, 0, 0.05);
   --box-shadow-strong:  0px 4px 10px 0px rgba(0, 0, 0, 0.05);
-
-  /* ── primitive: shimmer ────────────────────────────────────────────── */
-  --shimmer-hue-min: 0deg;
-  --shimmer-hue-max: 25deg;
-  --shimmer-hue-duration: 6s;
-
-  --shimmer-overlay-opacity-min: 0.03;
-  --shimmer-overlay-opacity-max: 0.12;
-  --shimmer-overlay-duration: 4s;
-
-  --shimmer-ease: ease-in-out;
 }
 
 /* ── explicit light theme ─────────────────────────────────────────────────── */

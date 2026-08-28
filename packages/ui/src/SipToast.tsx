@@ -107,23 +107,15 @@ function XIcon() {
 }
 
 // ─── bottle icon ──────────────────────────────────────────────────────────────
-// mix-blend-mode:color overlays the user's selected color onto the photographic
-// SVG while preserving luminance — keeps the bottle realistic but tinted.
+// The tint comes from the asset itself — getBottleUrl resolves to a per-color
+// SVG — so this renders flat, with no animation or blend layer over it.
 
 function BottleIcon({ platform, type, color }: { platform: SipPlatform; type: BottleType; color: BottleColor }) {
-  const src = platform.getBottleUrl(type, color)
   return (
-    <div style={{ position: 'relative', width: 24, height: 60, flexShrink: 0, isolation: 'isolate' }}>
-      <img
-        src={src}
-        alt=""
-        className="sip-bottle-shimmer"
-        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-      />
-      <div
-        className="sip-bottle-shimmer-overlay"
-        style={{ WebkitMaskImage: `url(${src})`, maskImage: `url(${src})` }}
-      />
-    </div>
+    <img
+      src={platform.getBottleUrl(type, color)}
+      alt=""
+      style={{ width: 24, height: 60, flexShrink: 0, objectFit: 'contain', display: 'block' }}
+    />
   )
 }
