@@ -12,9 +12,10 @@
 // NOTE the `--` before the arguments: npm otherwise swallows flags like
 // --dry-run and words it recognizes before they ever reach this script.
 //
-// It bumps the version in manifest.json + both package.json files (kept in
-// sync), builds the extension, and zips dist/ into releases/sip-vX.Y.Z.zip
-// with manifest.json at the zip root — the layout the Chrome Web Store expects.
+// It bumps the version in manifest.json + both package.json files + the
+// lockfile (all kept in sync), builds the extension, and zips dist/ into
+// releases/sip-vX.Y.Z.zip with manifest.json at the zip root — the layout the
+// Chrome Web Store expects.
 
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -112,6 +113,7 @@ if (dryRun) {
   else {
     console.log('Would update version in:')
     for (const f of VERSION_FILES) console.log(`  • ${f.replace(root + '/', '')}`)
+    console.log('  • package-lock.json (via npm install --package-lock-only)')
   }
   console.log(`Would build and write releases/sip-v${next}.zip`)
   process.exit(0)
@@ -133,6 +135,14 @@ if (!noBump) {
     writeFileSync(file, bumped)
     console.log(`  bumped ${file.replace(root + '/', '')}`)
   }
+
+  // package-lock.json carries the root version in TWO places (the top-level
+  // pair and the "" workspace entry) and npm rewrites both from package.json.
+  // Left out, the lock silently drifts a version behind on every release —
+  // which is exactly what ed66991 had to clean up by hand. --package-lock-only
+  // touches no node_modules and needs no network.
+  execSync('npm install --package-lock-only --silent', { cwd: root, stdio: 'inherit' })
+  console.log('  synced package-lock.json')
 }
 
 // --- build ----------------------------------------------------------------
