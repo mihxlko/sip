@@ -50,6 +50,23 @@ script.
 command. Give the user the absolute path — in a Conductor worktree it is *not*
 under `~/code/sip`.
 
+## Icons
+
+`npm run gen-icons -- <master.png>` regenerates all 28 icon files from one
+master (use 1024px). Do not resize by hand — the two families use different
+conventions and the filenames do not say which:
+
+- `sip-icon-N.png` is **2N** px — 16→32, 32→64, 64→128, 128→256
+- `iconN.png` is **N** px — 16→16, 32→32, 48→48, 128→128
+
+`sip-icon-dark-*.png` gets identical bytes to the light set: `platform.ts` in
+both apps picks the dark name under a dark theme, so those files must keep
+existing even when the art has no dark variant.
+
+After regenerating, **rebuild the package or the zip still has the old art**:
+`npm run release -- current` re-zips at the same version — correct as long as
+that version has not been uploaded yet. If it has, bump instead.
+
 ## Picking the version
 
 Chrome rejects any version that is not strictly greater than the live one, and
