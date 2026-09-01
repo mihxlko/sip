@@ -14,17 +14,38 @@
 // and the version number is burned whatever the outcome. That is why --submit
 // is opt-in rather than the default.
 //
-// Credentials come from .cws-credentials.json (see scripts/cws-auth.js) or,
-// for CI, the env vars CWS_CLIENT_ID / CWS_CLIENT_SECRET / CWS_REFRESH_TOKEN
-// / CWS_ITEM_ID.
+// WHERE CREDENTIALS COME FROM, in order — first hit wins:
+//
+//   1. env vars CWS_CLIENT_ID / CWS_CLIENT_SECRET / CWS_REFRESH_TOKEN   (CI)
+//   2. $SIP_CWS_CREDENTIALS                                (explicit override)
+//   3. <repo>/.cws-credentials.json                    (per-checkout override)
+//   4. ~/.config/sip/cws-credentials.json                        (the default)
+//
+// 4 is where `npm run cws:auth` writes, and it is the reason authorising once
+// covers every Conductor worktree and every future clone: the token lives in
+// the HOME directory, not in a checkout that gets archived. 3 exists only for
+// the case of deliberately using a different Google account in one checkout.
+//
+// The item id is NOT a secret and is not part of that resolution — it is a
+// repo constant below, overridable per credentials file for a second item.
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const CREDS = join(root, '.cws-credentials.json')
+const LOCAL_CREDS = join(root, '.cws-credentials.json')
+const USER_CREDS = join(
+  process.env.XDG_CONFIG_HOME || join(homedir(), '.config'),
+  'sip',
+  'cws-credentials.json',
+)
 const RELEASES = join(root, 'releases')
+
+// The SIP extension on the Chrome Web Store. Public — it is in the store URL
+// and in apps/web/src/links.ts.
+const DEFAULT_ITEM_ID = 'dcipoicfooachjhpchgficlmbkbhogbf'
 
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
@@ -40,26 +61,40 @@ function fail(msg) {
 // --- credentials ----------------------------------------------------------
 
 function loadCreds() {
-  const env = {
-    client_id: process.env.CWS_CLIENT_ID,
-    client_secret: process.env.CWS_CLIENT_SECRET,
-    refresh_token: process.env.CWS_REFRESH_TOKEN,
-    item_id: process.env.CWS_ITEM_ID,
+  if (process.env.CWS_CLIENT_ID && process.env.CWS_CLIENT_SECRET && process.env.CWS_REFRESH_TOKEN) {
+    return {
+      source: 'environment',
+      client_id: process.env.CWS_CLIENT_ID,
+      client_secret: process.env.CWS_CLIENT_SECRET,
+      refresh_token: process.env.CWS_REFRESH_TOKEN,
+      item_id: process.env.CWS_ITEM_ID ?? DEFAULT_ITEM_ID,
+    }
   }
-  if (env.client_id && env.client_secret && env.refresh_token) {
-    return { ...env, item_id: env.item_id ?? 'dcipoicfooachjhpchgficlmbkbhogbf' }
-  }
-  if (!existsSync(CREDS)) {
+
+  const path = [process.env.SIP_CWS_CREDENTIALS, LOCAL_CREDS, USER_CREDS].find(
+    p => p && existsSync(p),
+  )
+  if (!path) {
     fail(
-      'No credentials. Run `npm run cws:auth` once to authorise,\n' +
-        '  or set CWS_CLIENT_ID / CWS_CLIENT_SECRET / CWS_REFRESH_TOKEN.',
+      'No credentials. Run `npm run cws:auth` once — it stores the token in\n' +
+        `  ${USER_CREDS.replace(homedir(), '~')}, so it works from every\n` +
+        '  worktree and survives archiving this one.',
     )
   }
-  const c = JSON.parse(readFileSync(CREDS, 'utf8'))
-  for (const k of ['client_id', 'client_secret', 'refresh_token', 'item_id']) {
-    if (!c[k]) fail(`.cws-credentials.json is missing "${k}" — re-run \`npm run cws:auth\`.`)
+
+  let c
+  try {
+    c = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (e) {
+    // Node's JSON errors embed the offending text verbatim, newlines and all,
+    // which shreds the message when it is printed as one line.
+    const why = e.message.replace(/\s+/g, ' ').slice(0, 120)
+    fail(`${path} is not valid JSON — re-run \`npm run cws:auth\`.\n  (${why})`)
   }
-  return c
+  for (const k of ['client_id', 'client_secret', 'refresh_token']) {
+    if (!c[k]) fail(`${path} is missing "${k}" — re-run \`npm run cws:auth\`.`)
+  }
+  return { ...c, item_id: c.item_id ?? DEFAULT_ITEM_ID, source: path.replace(homedir(), '~') }
 }
 
 async function accessToken(c) {
@@ -128,7 +163,7 @@ if (statusOnly) {
   const token = await accessToken(creds)
   const { ok, body } = await getStatus(token, creds.item_id)
   if (!ok) fail(`Status check failed: ${JSON.stringify(body, null, 2)}`)
-  console.log(`\nItem ${creds.item_id}`)
+  console.log(`\nItem ${creds.item_id}   (auth: ${creds.source})`)
   console.log(`  upload state : ${body.uploadState}`)
   console.log(`  crx version  : ${body.crxVersion ?? '(none)'}`)
   if (body.itemError?.length) {
@@ -146,6 +181,7 @@ const localVersion = /sip-v(\d+\.\d+\.\d+)\.zip$/.exec(zipPath)[1]
 console.log(`
 Chrome Web Store
   item     ${creds.item_id}
+  auth     ${creds.source}
   package  ${zipPath.replace(root + '/', '')}  (${(zip.length / 1e6).toFixed(1)} MB)
   version  ${localVersion}
   action   ${submit ? 'upload AND submit for review' : 'upload as draft only'}${dryRun ? '   (dry run)' : ''}

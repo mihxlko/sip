@@ -119,20 +119,49 @@ letting Chrome reject it after the transfer.
 
 ### If it has never been authorised on this machine
 
-`npm run cws:auth`, once. It needs a Google Cloud project with the Chrome Web
-Store API enabled and a **Desktop app** OAuth client; the script prints the
-click path and then runs a loopback OAuth flow, writing
-`.cws-credentials.json` (chmod 600, gitignored).
+`npm run cws:auth`, **once per machine — not once per checkout.** It writes
+`~/.config/sip/cws-credentials.json`, so every Conductor worktree and every
+future clone picks the same token up, and archiving a workspace does not take
+it away. Needs a Google Cloud project with the Chrome Web Store API enabled and
+a **Desktop app** OAuth client; the script prints the click path and then runs
+a loopback OAuth flow.
 
-Claude cannot do this part — the consent step needs the user's browser and
-Google account. Being signed into the Web Store dashboard does **not** help;
-Claude has no access to browser sessions or cookies.
+Credential resolution, first hit wins — `cws:publish` prints which one it used
+on an `auth` line, so start there when something authenticates unexpectedly:
+
+1. env `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` / `CWS_REFRESH_TOKEN` (CI)
+2. `$SIP_CWS_CREDENTIALS` (explicit path)
+3. `<repo>/.cws-credentials.json` — per-checkout override, written by
+   `npm run cws:auth -- --local`. Only for deliberately using a different
+   Google account in one checkout.
+4. `~/.config/sip/cws-credentials.json` — the default
+
+Claude cannot do the consent step — it needs the user's browser and Google
+account. Being signed into the Web Store dashboard does **not** help; Claude has
+no access to browser sessions or cookies.
 
 **The 7-day trap.** If the OAuth consent screen is left in "Testing" rather than
 "In production", Google expires the refresh token after 7 days and every publish
 then fails with `invalid_grant`. `publish.js` names this explicitly when it sees
 that error. The fix is to switch the consent screen to production and re-run
 `npm run cws:auth`.
+
+### What the token can actually do
+
+The scope is `https://www.googleapis.com/auth/chromewebstore`, and it is worth
+being precise about what that covers, because it is broader than it looks:
+
+- It authorises a **Google account**, not a repo and not a workspace. There is
+  no such thing as "authorising the repo" — OAuth has no concept of it.
+- It is **write access to every extension that account can publish**, not just
+  SIP. Which item gets touched is decided by the item id the script sends, not
+  by anything Google enforces. The file is the blast radius: keep it 0600, keep
+  it out of the repo, and never paste it into a chat or an issue.
+- Read-only alternatives exist (`chromewebstore.readonly`) but cannot upload, so
+  they are no use here.
+
+If that breadth is uncomfortable, the mitigation is a separate Google account
+that owns only this extension — not a narrower scope, because none exists.
 
 ### Still manual
 

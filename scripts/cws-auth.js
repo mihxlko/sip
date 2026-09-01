@@ -3,9 +3,17 @@
 //
 //   npm run cws:auth
 //
+//   npm run cws:auth -- --local     (rare — see below)
+//
 // Exchanges a Google OAuth consent for a REFRESH token and writes it to
-// .cws-credentials.json (gitignored). Run once; scripts/publish.js uses the
-// stored token from then on and never needs a browser again.
+// ~/.config/sip/cws-credentials.json. Run ONCE PER MACHINE, not once per
+// checkout: the token lives in HOME, so every Conductor worktree and every
+// future clone of this repo picks it up, and archiving a workspace does not
+// take it with them.
+//
+// --local writes <repo>/.cws-credentials.json instead (gitignored). That is
+// only for deliberately using a different Google account in one checkout;
+// publish.js prefers a local file over the user-level one when both exist.
 //
 // WHY A LOOPBACK SERVER
 //   Google killed the copy-paste "out of band" flow (urn:ietf:wg:oauth:2.0:oob)
@@ -20,13 +28,22 @@
 
 import { createServer } from 'node:http'
 import { createInterface } from 'node:readline/promises'
-import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFile } from 'node:child_process'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const CREDS = join(root, '.cws-credentials.json')
+const local = process.argv.slice(2).includes('--local')
+const CREDS = local
+  ? join(root, '.cws-credentials.json')
+  : join(
+      process.env.XDG_CONFIG_HOME || join(homedir(), '.config'),
+      'sip',
+      'cws-credentials.json',
+    )
+const shown = CREDS.replace(homedir(), '~')
 const SCOPE = 'https://www.googleapis.com/auth/chromewebstore'
 const PORT = 8976 // arbitrary, just has to match the redirect URI you register
 
@@ -44,7 +61,7 @@ if (existsSync(CREDS)) {
   existing = JSON.parse(readFileSync(CREDS, 'utf8'))
   if (existing.refresh_token) {
     const go = await rl.question(
-      '.cws-credentials.json already holds a refresh token.\nReplace it? [y/N] ',
+      `${shown} already holds a refresh token.\nReplace it? [y/N] `,
     )
     if (go.trim().toLowerCase() !== 'y') {
       console.log('Left it alone.')
@@ -56,6 +73,9 @@ if (existsSync(CREDS)) {
 console.log(`
 Chrome Web Store API — one-time authorisation
 ─────────────────────────────────────────────
+Writing to: ${shown}
+${local ? '(--local: this checkout only)' : '(covers every worktree and clone on this machine)'}
+
 If you have not created the OAuth client yet, stop and do that first:
 
   1. https://console.cloud.google.com/projectcreate  — any name
@@ -157,6 +177,7 @@ if (!token.refresh_token) {
   )
 }
 
+mkdirSync(dirname(CREDS), { recursive: true, mode: 0o700 })
 writeFileSync(
   CREDS,
   JSON.stringify(
@@ -164,8 +185,9 @@ writeFileSync(
       client_id: clientId,
       client_secret: clientSecret,
       refresh_token: token.refresh_token,
-      // Not a secret, just saves passing it every time.
-      item_id: existing.item_id ?? 'dcipoicfooachjhpchgficlmbkbhogbf',
+      // Only written if it was already overridden — the item id is a repo
+      // constant in publish.js, so the same token serves several extensions.
+      ...(existing.item_id ? { item_id: existing.item_id } : {}),
     },
     null,
     2,
@@ -174,7 +196,7 @@ writeFileSync(
 chmodSync(CREDS, 0o600)
 
 console.log(`
-✓ Wrote .cws-credentials.json (chmod 600, gitignored)
+✓ Wrote ${shown} (chmod 600)
 
   You can now run:  npm run cws:publish
 
