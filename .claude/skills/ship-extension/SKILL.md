@@ -143,6 +143,21 @@ it away. Needs a Google Cloud project with the Chrome Web Store API enabled and
 a **Desktop app** OAuth client; the script prints the click path and then runs
 a loopback OAuth flow.
 
+**"Desktop app" is a question about the client, not the product.** The client
+is the Node CLI in `scripts/`, so it is a desktop/native client — this has
+nothing to do with SIP being a web app and a Chrome extension, and nothing to
+do with where the repo lives. Two wrong answers are tempting:
+
+- *"Chrome extension"* — for an extension that calls Google APIs itself via
+  `chrome.identity`. SIP's extension never talks to Google.
+- *"Web application"* — for a server with a public HTTPS redirect, and it would
+  put a web client secret in a local CLI.
+
+A Desktop client usually shows **no redirect-URI field at all**; loopback
+addresses are permitted implicitly for that type. Nothing to configure and
+nothing missing. Only if the console does show an "Authorised redirect URIs"
+box does `http://127.0.0.1:8976` need to go in it.
+
 Credential resolution, first hit wins — `cws:publish` prints which one it used
 on an `auth` line, so start there when something authenticates unexpectedly:
 

@@ -85,6 +85,13 @@ If you have not created the OAuth client yet, stop and do that first:
      "In production"  ← IMPORTANT, see the note at the end
   4. APIs & Services → Credentials → Create credentials →
      OAuth client ID → Application type: "Desktop app"
+
+     "Desktop app" describes THIS SCRIPT — a CLI running on your machine —
+     not what SIP is. Do NOT pick "Chrome extension" because SIP happens to
+     be one: that type is for an extension calling Google APIs itself, which
+     SIP never does. "Web application" is for a server with an HTTPS
+     redirect, which this is not.
+
   5. Copy the client ID and client secret
 `)
 
@@ -138,13 +145,15 @@ const code = await new Promise((resolvePromise, rejectPromise) => {
   )
   server.listen(PORT, '127.0.0.1', () => {
     console.log(`
-Add this EXACT redirect URI to the OAuth client (Credentials → your client →
-Authorised redirect URIs) if it is not there already:
+Listening for the redirect on ${redirectUri}
 
-  ${redirectUri}
+  A "Desktop app" client usually shows NO redirect-URI field in the console —
+  loopback addresses are allowed implicitly for that client type, so there is
+  nothing to configure and nothing missing. Only if your console does show an
+  "Authorised redirect URIs" box does that exact URI need to go in it.
 
-Then open this URL and approve. Google will warn the app is unverified —
-that is expected for a personal client; choose Advanced → Go to … (unsafe).
+Open this URL and approve. Google will warn the app is unverified — expected
+for a personal client; choose Advanced → Go to … (unsafe).
 
   ${authUrl}
 `)
