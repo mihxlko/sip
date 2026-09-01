@@ -17,3 +17,7 @@ next-env.d.ts
 # personal design/notes docs (see gitignore-notes-md-convention memory)
 design-docs.md
 dev-notes.md
+
+# Chrome Web Store API credentials — client secret + refresh token, written by
+# `npm run cws:auth`. Never commit; it can publish to the store on your behalf.
+.cws-credentials.json

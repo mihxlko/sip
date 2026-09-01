@@ -11,7 +11,9 @@
   "scripts": {
     "sync-dark-tokens": "node scripts/sync-dark-tokens.js",
     "check-tokens": "node scripts/sync-dark-tokens.js --check",
-    "release": "node scripts/release.js"
+    "release": "node scripts/release.js",
+    "cws:auth": "node scripts/cws-auth.js",
+    "cws:publish": "node scripts/publish.js"
   },
   "devDependencies": {
     "playwright": "^1.61.1"
