@@ -12,7 +12,7 @@ Two surfaces ship from this repo and **they ship differently**:
 | | how it ships | needs a human? |
 |---|---|---|
 | **web app** (`apps/web`) | Vercel deploys production automatically on merge to `main` | no |
-| **extension** (`apps/extension`) | `npm run release` builds a zip; a human uploads it | **yes** |
+| **extension** (`apps/extension`) | `npm run release` builds a zip, `npm run cws:publish` uploads it | only for the first auth |
 
 So "merged" means the web app is live and the extension is not. When asked
 whether something shipped, check which surface it was.
@@ -97,25 +97,47 @@ gh pr merge --merge          # add --delete-branch only if the user wants it gon
 
 Check `gh pr checks` before merging — Vercel runs on every PR.
 
-## The manual step
+## Uploading to the store
 
-The script prints it, and it is genuinely manual:
+```bash
+npm run cws:publish                 # upload the newest zip as a DRAFT
+npm run cws:publish -- 2.0.1        # a specific version
+npm run cws:publish -- --submit     # upload AND submit for review
+npm run cws:publish -- --status     # what the store currently has
+npm run cws:publish -- --dry-run    # resolve everything, send nothing
+```
 
-1. [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole) → the SIP item
-   (extension ID `dcipoicfooachjhpchgficlmbkbhogbf`)
-2. **Package → Upload new package** → `releases/sip-vX.Y.Z.zip`
-3. Submit for review (review typically takes hours to a few days)
+**Upload and submit are not the same risk.** An uploaded draft sits on the item
+and can be replaced by uploading again — reversible. Submitting enters Google's
+review queue and burns the version number whatever the outcome — not reversible,
+and a version can never be reused. So the default is draft-only and `--submit`
+is opt-in. Do not pass `--submit` unless the user asked to submit, not merely to
+upload.
 
-Claude cannot do this — it needs a signed-in browser session. Hand over the
-absolute path to the zip and stop there.
+The script refuses to upload a version the store already has, rather than
+letting Chrome reject it after the transfer.
 
-**It is automatable, but not for free.** The Chrome Web Store API can upload and
-publish over HTTPS with an OAuth2 refresh token. The one-time setup is a Google
-Cloud project, the Web Store API enabled, an OAuth client, and a refresh token
-generated through a consent screen — all of which need the user's browser and
-Google account, and produce secrets that must stay out of the repo. Worth doing
-if releases are frequent; not worth it for a few a year. Offer it, explain that
-cost, and let the user decide — do not start the credential setup unprompted.
+### If it has never been authorised on this machine
+
+`npm run cws:auth`, once. It needs a Google Cloud project with the Chrome Web
+Store API enabled and a **Desktop app** OAuth client; the script prints the
+click path and then runs a loopback OAuth flow, writing
+`.cws-credentials.json` (chmod 600, gitignored).
+
+Claude cannot do this part — the consent step needs the user's browser and
+Google account. Being signed into the Web Store dashboard does **not** help;
+Claude has no access to browser sessions or cookies.
+
+**The 7-day trap.** If the OAuth consent screen is left in "Testing" rather than
+"In production", Google expires the refresh token after 7 days and every publish
+then fails with `invalid_grant`. `publish.js` names this explicitly when it sees
+that error. The fix is to switch the consent screen to production and re-run
+`npm run cws:auth`.
+
+### Still manual
+
+Store *listing* changes — description, screenshots, categories — are not covered
+by this API path. Those stay in the dashboard. The API only moves packages.
 
 ## Known sharp edges
 
@@ -130,3 +152,6 @@ cost, and let the user decide — do not start the credential setup unprompted.
   fresh clone.
 - The zip is ~13 MB, mostly self-hosted fonts and logo PNGs. That is expected,
   and far under the Web Store limit.
+- **`npm publish` is not `npm run cws:publish`.** The store script is namespaced
+  `cws:` on purpose: npm reserves `publish` as a lifecycle hook, and a script by
+  that name can be triggered by the registry command rather than by you.
